@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 # --- CONFIGURACIÓN ---
 USUARIO = os.environ.get('SMS_USER')
 CLAVE = os.environ.get('SMS_PASS')
-DIAS_ATRAS = 730  # 2 años de historia
+DIAS_ATRAS = 365  # Probamos con 1 año primero para asegurar éxito
 
 url_inicio = 'http://65.108.69.39:5660/'
 url_login = 'http://65.108.69.39:5660/Home/CheckLogin'
@@ -15,14 +15,14 @@ session = requests.Session()
 session.headers.update({'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'})
 
 def login():
-    print("⏳ Iniciando sesión...")
+    print("⏳ Iniciando sesión...", flush=True)
     r = session.get(url_inicio)
     soup = BeautifulSoup(r.text, 'html.parser')
     token = soup.find('input', {'name': '__RequestVerificationToken'})['value']
     payload = {'Username': USUARIO, 'UserKey': CLAVE, 'RememberMe': 'true', '__RequestVerificationToken': token}
     h = {'RequestVerificationToken': token, 'X-Requested-With': 'XMLHttpRequest', 'Referer': url_inicio}
     session.post(url_login, data=payload, headers=h)
-    print("✅ Sesión establecida.")
+    print("✅ Sesión establecida.", flush=True)
 
 def descargar_y_resumir(f_inicio, f_fin):
     params = {
@@ -52,28 +52,28 @@ def descargar_y_resumir(f_inicio, f_fin):
         
         return resumen
     except Exception as e:
-        print(f"⚠️ Error en periodo {f_inicio}: {e}")
+        print(f"⚠️ Error en periodo {f_inicio}: {e}", flush=True)
         return pd.DataFrame()
 
 if __name__ == "__main__":
     if not os.path.exists('datos'): os.makedirs('datos')
     login()
     
-    # --- AJUSTE: Empezamos desde el fin de Enero 2026 ---
+    # Empezamos desde el fin de Enero 2026 para capturar todo ese mes
     fecha_actual_proceso = datetime(2026, 1, 31, 23, 59, 59)
     fecha_limite = fecha_actual_proceso - timedelta(days=DIAS_ATRAS)
     
     all_data = []
 
-    # Cargamos lo que ya tenemos de Febrero 2026 para unirlo
+    # Cargamos Febrero 2026 que ya existe en tu repo
     try:
         df_febrero = pd.read_excel('datos/reporte_actual.xlsx')
         all_data.append(df_febrero)
-        print("📁 Datos de Febrero 2026 cargados exitosamente.")
+        print("📁 Datos de Febrero 2026 cargados de la base actual.", flush=True)
     except:
-        print("⚠️ No se encontró archivo previo. Se creará uno nuevo.")
+        print("⚠️ No se encontró archivo previo. Se creará desde cero.", flush=True)
 
-    print(f"🚀 Iniciando saltos de 7 días desde Enero 2026 hacia atrás...")
+    print(f"🚀 Iniciando descarga de {DIAS_ATRAS} días en saltos de 7 días...", flush=True)
 
     while fecha_actual_proceso > fecha_limite:
         f_fin = fecha_actual_proceso
@@ -82,21 +82,24 @@ if __name__ == "__main__":
         ini_str = f_ini.replace(hour=0, minute=0, second=0).strftime('%Y-%m-%d %H:%M:%S')
         fin_str = f_fin.strftime('%Y-%m-%d %H:%M:%S')
         
-        print(f"📅 Rango: {ini_str} al {f_fin.strftime('%Y-%m-%d')}")
+        # El flush=True obliga a GitHub a mostrar esta línea AHORA
+        print(f"📅 Rango: {ini_str} al {f_fin.strftime('%Y-%m-%d')}... ", end="", flush=True)
         
         df_semana = descargar_y_resumir(ini_str, fin_str)
         
         if not df_semana.empty:
             all_data.append(df_semana)
-            print(f"   ✅ {len(df_semana)} filas agregadas.")
+            print(f"✅ {len(df_semana)} filas.", flush=True)
+        else:
+            print("⚪ Sin datos.", flush=True)
         
         fecha_actual_proceso = f_ini - timedelta(seconds=1)
 
     if all_data:
+        print("\n⚙️ Uniendo todos los periodos...", flush=True)
         df_final = pd.concat(all_data, ignore_index=True)
-        # Aseguramos que las fechas se vean bien y eliminamos duplicados
         df_final = df_final.drop_duplicates()
         df_final.to_excel('datos/reporte_actual.xlsx', index=False)
-        print(f"\n🏆 ¡PROCESO COMPLETADO! Febrero + Enero + 2 años de historia guardados.")
+        print(f"🏆 ¡PROCESO COMPLETADO! Archivo guardado.", flush=True)
     else:
-        print("\n❌ No se pudo recuperar información.")
+        print("\n❌ No se pudo recuperar información.", flush=True)
