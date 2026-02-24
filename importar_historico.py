@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 # --- CONFIGURACIÓN ---
 USUARIO = os.environ.get('SMS_USER')
 CLAVE = os.environ.get('SMS_PASS')
-DIAS_ATRAS = 730  # 2 años aprox (365 * 2)
+DIAS_ATRAS = 730  # 2 años de historia
 
 url_inicio = 'http://65.108.69.39:5660/'
 url_login = 'http://65.108.69.39:5660/Home/CheckLogin'
@@ -42,8 +42,8 @@ def descargar_y_resumir(f_inicio, f_fin):
         df = pd.read_excel(io.BytesIO(r.content))
         if df.empty: return pd.DataFrame()
 
+        # Limpieza y Agrupación
         df['SubmitDate'] = pd.to_datetime(df['SubmitDate']).dt.date
-        
         resumen = df.groupby(['SubmitDate', 'CompanyName', 'CountryRealName', 'DLRStatus']).agg({
             'MessageParts': 'sum',
             'ClientCost': 'sum',
@@ -59,27 +59,26 @@ if __name__ == "__main__":
     if not os.path.exists('datos'): os.makedirs('datos')
     login()
     
-    # Empezamos desde el 31 de diciembre de 2025 para saltarnos febrero y enero que ya tienes/procesaste
-    fecha_actual_proceso = datetime(2025, 12, 31, 23, 59, 59)
+    # --- AJUSTE: Empezamos desde el fin de Enero 2026 ---
+    fecha_actual_proceso = datetime(2026, 1, 31, 23, 59, 59)
     fecha_limite = fecha_actual_proceso - timedelta(days=DIAS_ATRAS)
     
     all_data = []
 
-    # Intentamos mantener lo que ya tienes de Febrero 2026
+    # Cargamos lo que ya tenemos de Febrero 2026 para unirlo
     try:
-        df_actual = pd.read_excel('datos/reporte_actual.xlsx')
-        all_data.append(df_actual)
-        print("📁 Manteniendo datos de Febrero 2026 encontrados en el archivo.")
+        df_febrero = pd.read_excel('datos/reporte_actual.xlsx')
+        all_data.append(df_febrero)
+        print("📁 Datos de Febrero 2026 cargados exitosamente.")
     except:
-        print("info: Creando archivo desde cero.")
+        print("⚠️ No se encontró archivo previo. Se creará uno nuevo.")
 
-    print(f"🚀 Iniciando saltos de 7 días hacia el pasado...")
+    print(f"🚀 Iniciando saltos de 7 días desde Enero 2026 hacia atrás...")
 
     while fecha_actual_proceso > fecha_limite:
         f_fin = fecha_actual_proceso
-        f_ini = fecha_actual_proceso - timedelta(days=6) # 7 días contando el actual
+        f_ini = fecha_actual_proceso - timedelta(days=6)
         
-        # Ajustar para que no pida hora exacta de inicio si no es necesario, pero mantenemos el formato
         ini_str = f_ini.replace(hour=0, minute=0, second=0).strftime('%Y-%m-%d %H:%M:%S')
         fin_str = f_fin.strftime('%Y-%m-%d %H:%M:%S')
         
@@ -91,13 +90,13 @@ if __name__ == "__main__":
             all_data.append(df_semana)
             print(f"   ✅ {len(df_semana)} filas agregadas.")
         
-        # Movemos el cursor al día anterior al bloque procesado
         fecha_actual_proceso = f_ini - timedelta(seconds=1)
 
     if all_data:
         df_final = pd.concat(all_data, ignore_index=True)
+        # Aseguramos que las fechas se vean bien y eliminamos duplicados
         df_final = df_final.drop_duplicates()
         df_final.to_excel('datos/reporte_actual.xlsx', index=False)
-        print(f"\n🏆 ¡PROCESO COMPLETADO! Histórico de 2 años resumido y guardado.")
+        print(f"\n🏆 ¡PROCESO COMPLETADO! Febrero + Enero + 2 años de historia guardados.")
     else:
         print("\n❌ No se pudo recuperar información.")
