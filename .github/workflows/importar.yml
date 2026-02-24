@@ -1,23 +1,27 @@
 name: IMPORTACIÓN ÚNICA HISTÓRICA
-on: workflow_dispatch # Solo se corre manualmente
+on: workflow_dispatch
 
 jobs:
   importar:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.10'
-          cache: 'pip'
+          # Eliminamos la línea de cache que causaba el error
+          
       - name: Install dependencies
         run: pip install pandas requests openpyxl beautifulsoup4 lxml python-dateutil
+        
       - name: Run Import
         env:
           SMS_USER: ${{ secrets.SMS_USER }}
           SMS_PASS: ${{ secrets.SMS_PASS }}
         run: python importar_historico.py
+        
       - name: Commit & Push
         run: |
           git config --global user.name 'Histórico Bot'
