@@ -8,7 +8,6 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <style>
-        /* (Se mantienen los mismos estilos modernos que ya teníamos) */
         :root {
             --background: #f1f5f9; --surface: #ffffff; --primary: #4f46e5; --primary-hover: #4338ca;
             --secondary: #64748b; --text-main: #0f172a; --text-muted: #475569; --border: #e2e8f0;
@@ -179,7 +178,6 @@
         let charts = {};
         let rates = { EUR: 1.10, CLP: 0.0011 };
 
-        // INTENTO DE CARGA AUTOMÁTICA AL INICIAR
         window.addEventListener('DOMContentLoaded', () => {
             fetch('datos/reporte_actual.xlsx')
                 .then(response => {
@@ -191,13 +189,11 @@
                     procesarBufferExcel(buffer);
                 })
                 .catch(error => {
-                    // Si falla (ej. abriendo localmente), mostramos el menú de carga manual
                     document.getElementById('loading').classList.remove('show');
                     document.getElementById('uploadSection').style.display = 'block';
                 });
         });
 
-        // Lógica para carga manual (Fallback)
         const uploadArea = document.getElementById('uploadArea');
         const fileInput = document.getElementById('fileInput');
         const processBtn = document.getElementById('processBtn');
@@ -230,7 +226,6 @@
             };
         }
 
-        // Procesamiento en Web Worker
         function procesarBufferExcel(dataBuffer) {
             rates.EUR = parseFloat(document.getElementById('eurRate').value) || 1.10;
             rates.CLP = parseFloat(document.getElementById('clpRate').value) || 0.0011;
@@ -243,12 +238,15 @@
                         const { data, rates } = e.data;
                         const workbook = XLSX.read(data, { type: 'array', cellDates: true });
 
-                        if (!workbook.Sheets['DLRSheet']) throw new Error("Falta la hoja 'DLRSheet'.");
+                        // NUEVA LÓGICA: Tomar la primera hoja, sin importar el nombre
+                        const firstSheetName = workbook.SheetNames[0];
+                        const sheet = workbook.Sheets[firstSheetName];
 
-                        const sheet = workbook.Sheets['DLRSheet'];
+                        if (!sheet) throw new Error("El archivo Excel parece estar vacío o dañado.");
+
                         const jsonData = XLSX.utils.sheet_to_json(sheet);
 
-                        if (jsonData.length === 0) throw new Error("El archivo está vacío.");
+                        if (jsonData.length === 0) throw new Error("La hoja está vacía.");
 
                         const rawData = jsonData.map(row => {
                             const currency = row.ClientCurrency || 'USD';
@@ -291,14 +289,15 @@
                     initializeDashboard();
                 } else {
                     alert('Error procesando el Excel: ' + e.data.error);
-                    location.reload();
+                    // Si falla, mostramos el menú de carga manual
+                    document.getElementById('loading').classList.remove('show');
+                    document.getElementById('uploadSection').style.display = 'block';
                 }
                 worker.terminate();
             };
             worker.postMessage({ data: dataBuffer, rates: rates });
         }
 
-        // Resto de las funciones (Inicialización, Filtros, Gráficos)
         function initializeDashboard() {
             document.getElementById('loading').classList.remove('show');
             document.getElementById('dashboard').classList.add('show');
