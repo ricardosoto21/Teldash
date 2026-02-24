@@ -82,6 +82,11 @@ try:
 
     # --- PASO 4: PROCESAR Y UNIR LOS DATOS CON PANDAS ---
     print("⚙️ Uniendo datos nuevos con el historial...")
+
+    # --- LÍNEAS ESPÍA NUEVAS ---
+    print("🔍 Espiando los primeros caracteres del archivo descargado:")
+    print(respuesta_excel.text[:300]) 
+    # ---------------------------
     
     # Leemos el Excel descargado (desde la memoria, sin guardarlo en disco aún)
     df_nuevos = pd.read_excel(io.BytesIO(respuesta_excel.content))
