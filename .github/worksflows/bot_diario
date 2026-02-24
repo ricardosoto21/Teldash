@@ -1,0 +1,38 @@
+name: Bot de Actualización Diaria SMS
+
+on:
+  schedule:
+    # Se ejecuta todos los días a las 03:01 UTC (00:01 Hora Chile Continental)
+    - cron: '1 3 * * *'
+  workflow_dispatch: # Botón manual para probarlo cuando quieras
+
+jobs:
+  actualizar-datos:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout del código
+        uses: actions/checkout@v3
+
+      - name: Configurar Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+          
+      - name: Instalar librerías (Pandas, Requests, openpyxl, bs4)
+        run: pip install pandas openpyxl requests beautifulsoup4 lxml
+
+      - name: Ejecutar script de actualización (El Bot Ninja)
+        run: python update_data.py
+        env:
+          # Aquí inyectamos tus secretos de forma segura
+          SMS_USER: ${{ secrets.SMS_USER }}
+          SMS_PASS: ${{ secrets.SMS_PASS }}
+
+      - name: Subir el Excel actualizado de vuelta al repositorio
+        run: |
+          git config --global user.name 'Bot SMS Analytics'
+          git config --global user.email 'bot@tudominio.com'
+          git add datos/reporte_actual.xlsx
+          git commit -m "🤖 Actualización automática: Datos del día anterior" || echo "Sin cambios nuevos para guardar"
+          git push
