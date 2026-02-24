@@ -1,0 +1,27 @@
+name: IMPORTACIÓN ÚNICA HISTÓRICA
+on: workflow_dispatch # Solo se corre manualmente
+
+jobs:
+  importar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          cache: 'pip'
+      - name: Install dependencies
+        run: pip install pandas requests openpyxl beautifulsoup4 lxml python-dateutil
+      - name: Run Import
+        env:
+          SMS_USER: ${{ secrets.SMS_USER }}
+          SMS_PASS: ${{ secrets.SMS_PASS }}
+        run: python importar_historico.py
+      - name: Commit & Push
+        run: |
+          git config --global user.name 'Histórico Bot'
+          git config --global user.email 'bot@historia.com'
+          git add datos/reporte_actual.xlsx
+          git commit -m "📊 Carga de datos históricos resumidos" || exit 0
+          git push
