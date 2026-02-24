@@ -1,105 +1,155 @@
 import os, io, requests, pandas as pd
 from bs4 import BeautifulSoup
 from datetime import datetime, timedelta
+import time
 
 # --- CONFIGURACIÓN ---
 USUARIO = os.environ.get('SMS_USER')
 CLAVE = os.environ.get('SMS_PASS')
-DIAS_ATRAS = 365  # Probamos con 1 año primero para asegurar éxito
+DIAS_ATRAS = 365  # Puedes subirlo a 730 después de probar un año
+RUTA_EXCEL = 'datos/reporte_actual.xlsx'
 
-url_inicio = 'http://65.108.69.39:5660/'
-url_login = 'http://65.108.69.39:5660/Home/CheckLogin'
-url_descarga = 'http://65.108.69.39:5660/DLRWholesaleReport/DownloadExcel'
+URL_INICIO = 'http://65.108.69.39:5660/'
+URL_LOGIN = 'http://65.108.69.39:5660/Home/CheckLogin'
+URL_DESCARGA = 'http://65.108.69.39:5660/DLRWholesaleReport/DownloadExcel'
 
 session = requests.Session()
 session.headers.update({'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'})
 
-def login():
-    print("⏳ Iniciando sesión...", flush=True)
-    r = session.get(url_inicio)
-    soup = BeautifulSoup(r.text, 'html.parser')
-    token = soup.find('input', {'name': '__RequestVerificationToken'})['value']
-    payload = {'Username': USUARIO, 'UserKey': CLAVE, 'RememberMe': 'true', '__RequestVerificationToken': token}
-    h = {'RequestVerificationToken': token, 'X-Requested-With': 'XMLHttpRequest', 'Referer': url_inicio}
-    session.post(url_login, data=payload, headers=h)
-    print("✅ Sesión establecida.", flush=True)
+# --- CACHE DE MONEDAS PARA NO SATURAR APIS ---
+cache_tasas = {}
 
-def descargar_y_resumir(f_inicio, f_fin):
-    params = {
-        'StartDate': f_inicio, 'EndDate': f_fin,
-        'SenderID': '', 'DLRStatus': '', 'PhoneNumber': '', 'SMSID': '',
-        'VendorSMSID': '', 'CountryID': '', 'VendorAccountID': '',
-        'CustomerSMPPAccountID': '', 'ErrorDescription': '', 'MCC': '',
-        'MNC': '', 'ExcludeCountryID': '', 'ExcludeCustomerSMPPAccountID': '',
-        'CustomerId': ''
-    }
-    r = session.get(url_descarga, params=params)
+def obtener_tasa_diaria(fecha_str, moneda):
+    """Obtiene la tasa de cambio para una fecha específica."""
+    if moneda == 'USD': return 1.0
+    key = f"{fecha_str}_{moneda}"
+    if key in cache_tasas: return cache_tasas[key]
     
-    if "PK" not in r.text[:10]:
-        return pd.DataFrame()
-
     try:
-        df = pd.read_excel(io.BytesIO(r.content))
-        if df.empty: return pd.DataFrame()
-
-        # Limpieza y Agrupación
-        df['SubmitDate'] = pd.to_datetime(df['SubmitDate']).dt.date
-        resumen = df.groupby(['SubmitDate', 'CompanyName', 'CountryRealName', 'DLRStatus']).agg({
-            'MessageParts': 'sum',
-            'ClientCost': 'sum',
-            'TerminationCost': 'sum'
-        }).reset_index()
+        if moneda == 'EUR':
+            url = f"https://api.frankfurter.app/{fecha_str}?from=EUR&to=USD"
+            res = requests.get(url, timeout=5).json()
+            tasa = res['rates']['USD']
+        elif moneda == 'CLP':
+            # Para CLP usamos un valor de referencia histórico si la API falla 
+            # (o puedes conectar a otra API específica de CLP)
+            tasa = 0.0011 # Valor base aproximado
+        else:
+            tasa = 1.0
         
-        return resumen
-    except Exception as e:
-        print(f"⚠️ Error en periodo {f_inicio}: {e}", flush=True)
-        return pd.DataFrame()
+        cache_tasas[key] = tasa
+        return tasa
+    except:
+        # Fallback en caso de error de red o API
+        fallback = {'EUR': 1.08, 'CLP': 0.0011}
+        return fallback.get(moneda, 1.0)
 
+def agrupar_data(df):
+    """Agrupa los datos manteniendo el máximo detalle operativo."""
+    if df.empty: return df
+    
+    # Convertir fecha a objeto date (sin hora) para agrupar por día
+    df['SubmitDate'] = pd.to_datetime(df['SubmitDate']).dt.date
+    
+    # Dimensiones a mantener (según tu lista de columnas)
+    dimensiones = [
+        'SubmitDate', 'CompanyName', 'SMPPAccountName', 'SMPPUsername', 
+        'MCC', 'MNC', 'OperatorName', 'DLRStatus', 'ErrorDescription', 
+        'VendorAccountName', 'SenderID', 'CountryRealName', 'CurrencyCode', 
+        'SMSSource', 'SMSType', 'MessageType', 'ErrorCode'
+    ]
+    
+    # Solo usamos las columnas que existan en el archivo descargado
+    columnas_agrupar = [c for c in dimensiones if c in df.columns]
+    
+    # Columnas numéricas a sumar
+    metricas = ['MessageParts', 'ClientCost', 'TerminationCost']
+    if 'ClientCostUSD' in df.columns: metricas.append('ClientCostUSD')
+    if 'TerminationCostUSD' in df.columns: metricas.append('TerminationCostUSD')
+
+    resumen = df.groupby(columnas_agrupar).agg({m: 'sum' for m in metricas}).reset_index()
+    return resumen
+
+def convertir_moneda_df(df):
+    """Aplica la conversión de moneda fila por fila usando la fecha de cada SMS."""
+    if df.empty: return df
+    
+    def aplicar_conversion(row):
+        fecha = str(row['SubmitDate'])
+        tasa = obtener_tasa_diaria(fecha, row['CurrencyCode'])
+        return pd.Series([row['ClientCost'] * tasa, row['TerminationCost'] * tasa])
+
+    df[['ClientCostUSD', 'TerminationCostUSD']] = df.apply(aplicar_conversion, axis=1)
+    return df
+
+def login():
+    print("⏳ Iniciando sesión en el servidor...", flush=True)
+    r = session.get(URL_INICIO)
+    token = BeautifulSoup(r.text, 'html.parser').find('input', {'name': '__RequestVerificationToken'})['value']
+    payload = {'Username': USUARIO, 'UserKey': CLAVE, 'RememberMe': 'true', '__RequestVerificationToken': token}
+    session.post(URL_LOGIN, data=payload, headers={'RequestVerificationToken': token, 'X-Requested-With': 'XMLHttpRequest'})
+    print("✅ Conexión establecida.", flush=True)
+
+# --- INICIO DEL PROCESO ---
 if __name__ == "__main__":
     if not os.path.exists('datos'): os.makedirs('datos')
-    login()
-    
-    # Empezamos desde el fin de Enero 2026 para capturar todo ese mes
-    fecha_actual_proceso = datetime(2026, 1, 31, 23, 59, 59)
-    fecha_limite = fecha_actual_proceso - timedelta(days=DIAS_ATRAS)
     
     all_data = []
 
-    # Cargamos Febrero 2026 que ya existe en tu repo
-    try:
-        df_febrero = pd.read_excel('datos/reporte_actual.xlsx')
-        all_data.append(df_febrero)
-        print("📁 Datos de Febrero 2026 cargados de la base actual.", flush=True)
-    except:
-        print("⚠️ No se encontró archivo previo. Se creará desde cero.", flush=True)
+    # 1. CARGAR Y RE-AGRUPAR LO EXISTENTE (Febrero 2026)
+    if os.path.exists(RUTA_EXCEL):
+        print(f"📂 Cargando datos actuales de {RUTA_EXCEL} para optimizarlos...", flush=True)
+        df_temp = pd.read_excel(RUTA_EXCEL)
+        # Si no tiene columnas USD, las calculamos (usando tasa de hoy para lo actual)
+        if 'ClientCostUSD' not in df_temp.columns:
+            df_temp = convertir_moneda_df(df_temp)
+        all_data.append(agrupar_data(df_temp))
 
-    print(f"🚀 Iniciando descarga de {DIAS_ATRAS} días en saltos de 7 días...", flush=True)
+    # 2. LOGIN Y DESCARGA HISTÓRICA
+    login()
+    
+    # Empezamos desde el 31 de enero de 2026 hacia atrás
+    fecha_cursor = datetime(2026, 1, 31, 23, 59, 59)
+    fecha_limite = fecha_cursor - timedelta(days=DIAS_ATRAS)
+    
+    print(f"🚀 Iniciando viaje al pasado ({DIAS_ATRAS} días)...", flush=True)
 
-    while fecha_actual_proceso > fecha_limite:
-        f_fin = fecha_actual_proceso
-        f_ini = fecha_actual_proceso - timedelta(days=6)
+    while fecha_cursor > fecha_limite:
+        f_fin = fecha_cursor
+        f_ini = fecha_cursor - timedelta(days=6)
         
         ini_str = f_ini.replace(hour=0, minute=0, second=0).strftime('%Y-%m-%d %H:%M:%S')
         fin_str = f_fin.strftime('%Y-%m-%d %H:%M:%S')
         
-        # El flush=True obliga a GitHub a mostrar esta línea AHORA
         print(f"📅 Rango: {ini_str} al {f_fin.strftime('%Y-%m-%d')}... ", end="", flush=True)
         
-        df_semana = descargar_y_resumir(ini_str, fin_str)
+        params = {'StartDate': ini_str, 'EndDate': fin_str}
+        r = session.get(URL_DESCARGA, params=params)
         
-        if not df_semana.empty:
-            all_data.append(df_semana)
-            print(f"✅ {len(df_semana)} filas.", flush=True)
+        if "PK" in r.text[:10]:
+            df_semana = pd.read_excel(io.BytesIO(r.content))
+            if not df_semana.empty:
+                # Procesar: Convertir -> Agrupar
+                df_semana = convertir_moneda_df(df_semana)
+                df_semana_agrupada = agrupar_data(df_semana)
+                all_data.append(df_semana_agrupada)
+                print(f"✅ {len(df_semana_agrupada)} grupos de datos.", flush=True)
+            else:
+                print("⚪ Vacío.", flush=True)
         else:
-            print("⚪ Sin datos.", flush=True)
+            print("❌ Error descarga.", flush=True)
         
-        fecha_actual_proceso = f_ini - timedelta(seconds=1)
+        # Retroceder 7 días
+        fecha_cursor = f_ini - timedelta(seconds=1)
+        time.sleep(1) # Pausa breve para no saturar al proveedor
 
+    # 3. UNIFICACIÓN FINAL
     if all_data:
-        print("\n⚙️ Uniendo todos los periodos...", flush=True)
+        print("\n⚙️ Consolidando toda la información...", flush=True)
         df_final = pd.concat(all_data, ignore_index=True)
-        df_final = df_final.drop_duplicates()
-        df_final.to_excel('datos/reporte_actual.xlsx', index=False)
-        print(f"🏆 ¡PROCESO COMPLETADO! Archivo guardado.", flush=True)
+        # Volvemos a agrupar por si hay solapamiento de días
+        df_final = agrupar_data(df_final)
+        df_final.to_excel(RUTA_EXCEL, index=False)
+        print(f"🏆 ¡PROCESO COMPLETADO! Archivo optimizado con {len(df_final)} filas totales.")
     else:
-        print("\n❌ No se pudo recuperar información.", flush=True)
+        print("\n❌ No se pudo recuperar ningún dato.")
