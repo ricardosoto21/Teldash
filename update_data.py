@@ -1,81 +1,60 @@
-import os
-import io
-import requests
+import os, io, requests, pandas as pd
 from bs4 import BeautifulSoup
-import pandas as pd
 from datetime import datetime, timedelta
 
-# 1. Credenciales Secretas
+# --- CONFIGURACIÓN ---
 USUARIO = os.environ.get('SMS_USER')
 CLAVE = os.environ.get('SMS_PASS')
-
-if not USUARIO or not CLAVE:
-    print("❌ Error: Faltan las credenciales en GitHub Secrets.")
-    exit(1)
+ruta_excel = 'datos/reporte_actual.xlsx'
 
 url_inicio = 'http://65.108.69.39:5660/'
 url_login = 'http://65.108.69.39:5660/Home/CheckLogin'
 url_descarga = 'http://65.108.69.39:5660/DLRWholesaleReport/DownloadExcel'
-ruta_archivo_local = 'datos/reporte_actual.xlsx'
 
-# Iniciamos sesión y LE PONEMOS EL DISFRAZ DE CHROME 🥸
+# Disfraz de navegador para evitar bloqueos
 session = requests.Session()
 session.headers.update({
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-    'Accept-Language': 'es-ES,es;q=0.9',
-    'Connection': 'keep-alive'
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
 })
 
-print("🤖 Iniciando proceso con disfraz de navegador...")
-
-try:
-    # --- PASO 1: ROBAR EL TOKEN ---
-    print("⏳ Entrando a la web principal para obtener token...")
-    respuesta_inicio = session.get(url_inicio)
-    soup = BeautifulSoup(respuesta_inicio.text, 'html.parser')
+def login():
+    print("⏳ Entrando al sistema...", flush=True)
+    r = session.get(url_inicio)
+    token = BeautifulSoup(r.text, 'html.parser').find('input', {'name': '__RequestVerificationToken'})['value']
     
-    token_input = soup.find('input', {'name': '__RequestVerificationToken'})
-    if not token_input:
-        raise Exception("No se encontró el token de seguridad. ¿La web está caída?")
-        
-    token_secreto = token_input['value']
-    
-    # --- PASO 2: LOGIN ---
-    datos_login = {
-        'Username': USUARIO,
-        'UserKey': CLAVE,
-        'RememberMe': 'true',
-        '__RequestVerificationToken': token_secreto
+    payload = {
+        'Username': USUARIO, 
+        'UserKey': CLAVE, 
+        'RememberMe': 'true', 
+        '__RequestVerificationToken': token
     }
     
-    cabeceras_login = {
-        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+    headers_login = {
         'X-Requested-With': 'XMLHttpRequest',
-        'RequestVerificationToken': token_secreto,
-        'Origin': 'http://65.108.69.39:5660',
-        'Referer': 'http://65.108.69.39:5660/'
+        'RequestVerificationToken': token,
+        'Referer': url_inicio
     }
     
-    print("🔑 Enviando credenciales...")
-    respuesta_login = session.post(url_login, data=datos_login, headers=cabeceras_login)
-    
-    # Imprimimos lo que dice el servidor para estar 100% seguros de que nos dejó pasar
-    print("🔍 Servidor dice sobre el login:", respuesta_login.text[:100])
-    
-    if "true" not in respuesta_login.text.lower() and "success" not in respuesta_login.text.lower():
-        if respuesta_login.status_code != 200 and respuesta_login.status_code != 302:
-            raise Exception("El login parece haber fallado. Revisa credenciales.")
+    res = session.post(url_login, data=payload, headers=headers_login)
+    if "UserID" in res.text and "10" in res.text: # Ajustado según tu respuesta exitosa previa
+        print("✅ Login exitoso!", flush=True)
+    else:
+        print(f"⚠️ Aviso login: {res.text[:100]}", flush=True)
 
-    # --- PASO 3: CALCULAR FECHA ---
+def ejecutar_actualizacion():
+    if not os.path.exists('datos'): os.makedirs('datos')
+    
+    login()
+    
+    # 1. Definir rango de AYER
     ayer = datetime.now() - timedelta(days=1)
-    fecha_inicio = ayer.strftime('%Y-%m-%d 00:00:00')
-    fecha_fin = ayer.strftime('%Y-%m-%d 23:59:59')
-    print(f"📅 Solicitando reporte del día: {ayer.strftime('%Y-%m-%d')}")
-
-    # --- PASO 4: DESCARGAR ---
-    parametros_descarga = {
-        'StartDate': fecha_inicio,
-        'EndDate': fecha_fin,
+    f_inicio = ayer.strftime('%Y-%m-%d 00:00:00')
+    f_fin = ayer.strftime('%Y-%m-%d 23:59:59')
+    print(f"📅 Procesando fecha: {ayer.strftime('%Y-%m-%d')}", flush=True)
+    
+    # 2. Descargar datos
+    params = {
+        'StartDate': f_inicio, 'EndDate': f_fin,
         'SenderID': '', 'DLRStatus': '', 'PhoneNumber': '', 'SMSID': '',
         'VendorSMSID': '', 'CountryID': '', 'VendorAccountID': '',
         'CustomerSMPPAccountID': '', 'ErrorDescription': '', 'MCC': '',
@@ -83,41 +62,41 @@ try:
         'CustomerId': ''
     }
     
-    print("📥 Descargando Excel...")
-    respuesta_excel = session.get(url_descarga, params=parametros_descarga)
+    print("📥 Descargando reporte diario...", flush=True)
+    r = session.get(url_descarga, params=params)
     
-    print("🔍 Espiando descarga:", respuesta_excel.text[:150])
+    if "PK" not in r.text[:10]:
+        print("❌ El servidor no entregó un Excel válido. Fin del proceso.", flush=True)
+        return
+
+    # 3. Procesar y RESUMIR datos nuevos
+    df_nuevos_crudos = pd.read_excel(io.BytesIO(r.content))
+    if df_nuevos_crudos.empty:
+        print("⚪ No hubo tráfico ayer. Nada que agregar.", flush=True)
+        return
     
-    if "Log In | aSMSC" in respuesta_excel.text:
-        raise Exception("El servidor nos devolvió a la pantalla de Login. Autenticación fallida.")
+    print(f"⚙️ Resumiendo {len(df_nuevos_crudos)} filas nuevas...", flush=True)
+    df_nuevos_crudos['SubmitDate'] = pd.to_datetime(df_nuevos_crudos['SubmitDate']).dt.date
+    
+    df_resumido = df_nuevos_crudos.groupby(['SubmitDate', 'CompanyName', 'CountryRealName', 'DLRStatus']).agg({
+        'MessageParts': 'sum',
+        'ClientCost': 'sum',
+        'TerminationCost': 'sum'
+    }).reset_index()
 
-    # --- PASO 5: PANDAS ---
-    print("⚙️ Uniendo datos...")
-    # Si es HTML disfrazado usamos read_html, si es Excel read_excel
+    # 4. Unir con el histórico de GitHub
     try:
-        df_nuevos = pd.read_excel(io.BytesIO(respuesta_excel.content))
-    except ValueError:
-        print("⚠️ Formato Excel nativo falló, intentando leer como tabla web...")
-        df_nuevos = pd.read_html(io.StringIO(respuesta_excel.text))[0]
-
-    if df_nuevos.empty:
-        print("⚠️ El reporte de ayer no contiene datos. Fin del proceso.")
-        exit(0)
-
-    try:
-        df_actual = pd.read_excel(ruta_archivo_local, sheet_name=0)
+        df_historico = pd.read_excel(ruta_excel)
+        print(f"📚 Histórico cargado ({len(df_historico)} filas).", flush=True)
+        df_final = pd.concat([df_historico, df_resumido], ignore_index=True)
     except FileNotFoundError:
-        df_actual = pd.DataFrame()
+        print("🆕 No se encontró histórico, creando archivo nuevo.", flush=True)
+        df_final = df_resumido
 
-    df_final = pd.concat([df_actual, df_nuevos], ignore_index=True)
+    # 5. Limpiar duplicados y guardar
     df_final = df_final.drop_duplicates()
+    df_final.to_excel(ruta_excel, index=False)
+    print(f"🚀 ¡Éxito! Archivo actualizado. Total filas: {len(df_final)}", flush=True)
 
-    print("💾 Guardando el archivo...")
-    with pd.ExcelWriter(ruta_archivo_local, engine='openpyxl') as writer:
-        df_final.to_excel(writer, sheet_name='DLRSheet', index=False)
-        
-    print("🚀 ¡Éxito total! Datos listos.")
-
-except Exception as e:
-    print(f"❌ ERROR CRÍTICO: {e}")
-    exit(1)
+if __name__ == "__main__":
+    ejecutar_actualizacion()
