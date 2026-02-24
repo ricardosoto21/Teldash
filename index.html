@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SaaS Dashboard | SMS Analytics</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <style>
+        /* (Se mantienen los mismos estilos modernos que ya teníamos) */
+        :root {
+            --background: #f1f5f9; --surface: #ffffff; --primary: #4f46e5; --primary-hover: #4338ca;
+            --secondary: #64748b; --text-main: #0f172a; --text-muted: #475569; --border: #e2e8f0;
+            --success: #10b981; --danger: #ef4444; --warning: #f59e0b;
+            --radius-lg: 16px; --radius-md: 12px;
+            --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+            --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+            --shadow-hover: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', sans-serif; }
+        body { background-color: var(--background); color: var(--text-main); padding: 24px; line-height: 1.5; }
+        .card { background: var(--surface); border-radius: var(--radius-lg); box-shadow: var(--shadow-md); border: 1px solid rgba(255,255,255,0.5); transition: transform 0.2s ease, box-shadow 0.2s ease; }
+        .card:hover { box-shadow: var(--shadow-hover); transform: translateY(-2px); }
+        .upload-section { max-width: 800px; margin: 40px auto; padding: 48px; text-align: center; display: none; }
+        .upload-area { border: 2px dashed #cbd5e1; border-radius: var(--radius-lg); padding: 64px 32px; cursor: pointer; transition: all 0.3s ease; margin: 24px 0; background: #f8fafc; }
+        .upload-area:hover, .upload-area.dragover { border-color: var(--primary); background: #eef2ff; }
+        .currency-config { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin: 24px 0; text-align: left; }
+        .input-group label { display: block; font-size: 13px; font-weight: 600; color: var(--text-muted); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px; }
+        input[type="number"], input[type="date"], select { width: 100%; padding: 12px 16px; border: 1px solid var(--border); border-radius: var(--radius-md); font-size: 14px; color: var(--text-main); background: var(--surface); outline: none; }
+        input[type="number"]:focus, input[type="date"]:focus, select:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1); }
+        input[type="file"] { display: none; }
+        button { background: var(--primary); color: white; border: none; padding: 14px 28px; border-radius: var(--radius-md); cursor: pointer; font-size: 15px; font-weight: 600; transition: all 0.2s ease; box-shadow: var(--shadow-sm); }
+        button:hover:not(:disabled) { background: var(--primary-hover); transform: translateY(-1px); box-shadow: var(--shadow-md); }
+        button:disabled { background: var(--border); color: var(--text-muted); cursor: not-allowed; box-shadow: none; }
+        .btn-secondary { background: white; color: var(--text-main); border: 1px solid var(--border); }
+        .btn-secondary:hover:not(:disabled) { background: #f8fafc; }
+        .header { background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); color: white; padding: 32px 40px; border-radius: var(--radius-lg); margin-bottom: 32px; display: flex; justify-content: space-between; align-items: center; box-shadow: var(--shadow-md); }
+        .header h1 { font-size: 28px; font-weight: 700; letter-spacing: -0.5px; margin-bottom: 8px; }
+        .header p { color: #94a3b8; font-size: 15px; }
+        .filters { padding: 24px; margin-bottom: 32px; }
+        .filters-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid var(--border); padding-bottom: 16px; }
+        .filters-header h3 { font-size: 18px; color: var(--text-main); }
+        .filter-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; }
+        .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 24px; margin-bottom: 32px; }
+        .kpi-card { padding: 24px; }
+        .kpi-label { font-size: 13px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px; }
+        .kpi-value { font-size: 36px; font-weight: 700; letter-spacing: -1px; color: var(--text-main); }
+        .charts-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(450px, 1fr)); gap: 24px; margin-bottom: 32px; }
+        .chart-card, .table-card { padding: 24px; }
+        .chart-card h3, .table-card h3 { font-size: 18px; margin-bottom: 24px; color: var(--text-main); border-bottom: 1px solid var(--border); padding-bottom: 16px; }
+        .table-container { max-height: 500px; overflow-y: auto; margin: -12px; padding: 12px; }
+        table { width: 100%; border-collapse: separate; border-spacing: 0; }
+        th { background: var(--surface); padding: 16px; text-align: left; font-size: 13px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; border-bottom: 2px solid var(--border); position: sticky; top: 0; z-index: 10; }
+        td { padding: 16px; font-size: 14px; color: var(--text-main); border-bottom: 1px solid var(--border); }
+        tr:last-child td { border-bottom: none; }
+        tr:hover td { background: #f8fafc; }
+        .currency-badge { display: inline-flex; align-items: center; padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: 600; letter-spacing: 0.5px; }
+        .usd { background: #e0e7ff; color: #3730a3; }
+        .eur { background: #fef3c7; color: #92400e; }
+        .clp { background: #fee2e2; color: #991b1b; }
+        .loading { display: none; text-align: center; padding: 60px; }
+        .loading h3 { color: var(--primary); font-size: 20px; }
+        .loading p { color: var(--text-muted); margin-top: 8px; }
+        .loading.show { display: block; }
+        #dashboard { display: none; }
+        #dashboard.show { display: block; }
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    </style>
+</head>
+<body>
+    <div class="loading show" id="loading">
+        <div style="font-size: 48px; margin-bottom: 16px; animation: spin 2s linear infinite;">🔄</div>
+        <h3 id="loadingText">Obteniendo últimos datos del servidor...</h3>
+        <p>Por favor espera un momento.</p>
+    </div>
+
+    <div class="card upload-section" id="uploadSection">
+        <h2 style="font-size: 28px; margin-bottom: 12px;">⚠️ No se encontró el archivo automático</h2>
+        <p style="color: var(--text-muted);">Por favor, sube tu reporte manualmente para continuar.</p>
+        
+        <div class="upload-area" id="uploadArea">
+            <div style="font-size: 64px; margin-bottom: 16px;">📁</div>
+            <h3 style="margin-bottom: 8px;">Haz clic o arrastra tu archivo aquí</h3>
+            <p style="color: var(--secondary); font-size: 14px;">Solo archivos Excel son soportados</p>
+            <input type="file" id="fileInput" accept=".xlsx,.xls">
+        </div>
+        <div class="currency-config">
+            <div class="input-group">
+                <label>1 EUR = ? USD</label>
+                <input type="number" id="eurRate" value="1.10" step="0.01" min="0">
+            </div>
+            <div class="input-group">
+                <label>1 CLP = ? USD</label>
+                <input type="number" id="clpRate" value="0.0011" step="0.0001" min="0">
+            </div>
+        </div>
+        <button id="processBtn" disabled style="width: 100%; margin-top: 16px; padding: 16px;">Procesar Datos</button>
+    </div>
+
+    <div id="dashboard">
+        <div class="header">
+            <div>
+                <h1>Dashboard de Inteligencia SMS</h1>
+                <p>Métricas financieras y operativas centralizadas en USD</p>
+            </div>
+        </div>
+
+        <div class="card filters">
+            <div class="filters-header">
+                <h3>🔍 Filtros Globales</h3>
+                <button class="btn-secondary" onclick="resetFilters()" style="padding: 8px 16px; font-size: 13px;">🔄 Limpiar</button>
+            </div>
+            <div class="filter-grid">
+                <div class="input-group">
+                    <label>Fecha Desde</label>
+                    <input type="date" id="startDateFilter">
+                </div>
+                <div class="input-group">
+                    <label>Fecha Hasta</label>
+                    <input type="date" id="endDateFilter">
+                </div>
+                <div class="input-group">
+                    <label>Cliente</label>
+                    <select id="clientFilter"><option value="">Todos los clientes</option></select>
+                </div>
+                <div class="input-group">
+                    <label>País Destino</label>
+                    <select id="countryFilter"><option value="">Todos los países</option></select>
+                </div>
+                <div class="input-group">
+                    <label>Estado DLR</label>
+                    <select id="statusFilter"><option value="">Todos los estados</option></select>
+                </div>
+            </div>
+        </div>
+
+        <div class="kpis" id="kpis"></div>
+
+        <div class="charts-row">
+            <div class="card chart-card">
+                <h3>Volumen por País (Top 10)</h3>
+                <canvas id="countryChart"></canvas>
+            </div>
+            <div class="card chart-card">
+                <h3>Tendencia de Envíos</h3>
+                <canvas id="trendChart"></canvas>
+            </div>
+        </div>
+
+        <div class="card table-card">
+            <h3>Desglose Financiero por Cliente</h3>
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Compañía</th>
+                            <th>Moneda</th>
+                            <th>Volumen SMS</th>
+                            <th>Ingresos (USD)</th>
+                            <th>Costos (USD)</th>
+                            <th>Margen Neto</th>
+                            <th>Rentabilidad</th>
+                            <th>Tasa Entrega</th>
+                        </tr>
+                    </thead>
+                    <tbody id="clientTableBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let rawData = [];
+        let filteredData = [];
+        let charts = {};
+        let rates = { EUR: 1.10, CLP: 0.0011 };
+
+        // INTENTO DE CARGA AUTOMÁTICA AL INICIAR
+        window.addEventListener('DOMContentLoaded', () => {
+            fetch('datos/reporte_actual.xlsx')
+                .then(response => {
+                    if (!response.ok) throw new Error('Archivo no encontrado');
+                    return response.arrayBuffer();
+                })
+                .then(buffer => {
+                    document.getElementById('loadingText').textContent = "Procesando datos en segundo plano...";
+                    procesarBufferExcel(buffer);
+                })
+                .catch(error => {
+                    // Si falla (ej. abriendo localmente), mostramos el menú de carga manual
+                    document.getElementById('loading').classList.remove('show');
+                    document.getElementById('uploadSection').style.display = 'block';
+                });
+        });
+
+        // Lógica para carga manual (Fallback)
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+        const processBtn = document.getElementById('processBtn');
+
+        uploadArea.addEventListener('click', () => fileInput.click());
+        uploadArea.addEventListener('dragover', (e) => { e.preventDefault(); uploadArea.classList.add('dragover'); });
+        uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('dragover'));
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+        });
+        fileInput.addEventListener('change', (e) => { if (e.target.files[0]) handleFile(e.target.files[0]); });
+
+        function handleFile(file) {
+            if (!file.name.match(/\.(xlsx|xls)$/)) {
+                alert('Formato inválido. Sube un archivo Excel.');
+                return;
+            }
+            processBtn.disabled = false;
+            processBtn.textContent = `Procesar: ${file.name}`;
+            processBtn.onclick = () => {
+                document.getElementById('uploadSection').style.display = 'none';
+                document.getElementById('loading').classList.add('show');
+                document.getElementById('loadingText').textContent = "Procesando datos...";
+                
+                const reader = new FileReader();
+                reader.onload = (e) => procesarBufferExcel(e.target.result);
+                reader.readAsArrayBuffer(file);
+            };
+        }
+
+        // Procesamiento en Web Worker
+        function procesarBufferExcel(dataBuffer) {
+            rates.EUR = parseFloat(document.getElementById('eurRate').value) || 1.10;
+            rates.CLP = parseFloat(document.getElementById('clpRate').value) || 0.0011;
+
+            const workerCode = `
+                importScripts('https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js');
+
+                self.onmessage = function(e) {
+                    try {
+                        const { data, rates } = e.data;
+                        const workbook = XLSX.read(data, { type: 'array', cellDates: true });
+
+                        if (!workbook.Sheets['DLRSheet']) throw new Error("Falta la hoja 'DLRSheet'.");
+
+                        const sheet = workbook.Sheets['DLRSheet'];
+                        const jsonData = XLSX.utils.sheet_to_json(sheet);
+
+                        if (jsonData.length === 0) throw new Error("El archivo está vacío.");
+
+                        const rawData = jsonData.map(row => {
+                            const currency = row.ClientCurrency || 'USD';
+                            const rate = currency === 'EUR' ? rates.EUR : currency === 'CLP' ? rates.CLP : 1;
+                            
+                            let parsedDate = '';
+                            if (row.SubmitDate) {
+                                let d = new Date(row.SubmitDate);
+                                if (!isNaN(d.getTime())) {
+                                    parsedDate = d.toISOString().split('T')[0];
+                                } else {
+                                    parsedDate = String(row.SubmitDate).split(' ')[0];
+                                }
+                            }
+                            
+                            return {
+                                CompanyName: row.CompanyName || 'Desconocido',
+                                CountryRealName: row.CountryRealName || 'Desconocido',
+                                ClientCurrency: currency,
+                                ClientCostUSD: (parseFloat(row.ClientCost) || 0) * rate,
+                                TerminationCostUSD: (parseFloat(row.TerminationCost) || 0) * rate,
+                                DLRStatus: row.DLRStatus || 'Desconocido',
+                                DLRDelay: parseInt(row.DLRDelay) || 0,
+                                SubmitDate: parsedDate,
+                            };
+                        });
+                        self.postMessage({ success: true, rawData: rawData });
+                    } catch (error) {
+                        self.postMessage({ success: false, error: error.message });
+                    }
+                };
+            `;
+            const blob = new Blob([workerCode], { type: 'application/javascript' });
+            const worker = new Worker(URL.createObjectURL(blob));
+
+            worker.onmessage = function(e) {
+                if (e.data.success) {
+                    rawData = e.data.rawData;
+                    filteredData = [...rawData];
+                    initializeDashboard();
+                } else {
+                    alert('Error procesando el Excel: ' + e.data.error);
+                    location.reload();
+                }
+                worker.terminate();
+            };
+            worker.postMessage({ data: dataBuffer, rates: rates });
+        }
+
+        // Resto de las funciones (Inicialización, Filtros, Gráficos)
+        function initializeDashboard() {
+            document.getElementById('loading').classList.remove('show');
+            document.getElementById('dashboard').classList.add('show');
+
+            const clients = [...new Set(rawData.map(d => d.CompanyName))].sort();
+            const countries = [...new Set(rawData.map(d => d.CountryRealName))].sort();
+            const statuses = [...new Set(rawData.map(d => d.DLRStatus))].sort();
+
+            populateSelect('clientFilter', clients);
+            populateSelect('countryFilter', countries);
+            populateSelect('statusFilter', statuses);
+
+            const validDates = rawData.map(d => d.SubmitDate).filter(d => d).sort();
+            if (validDates.length > 0) {
+                document.getElementById('startDateFilter').value = validDates[0];
+                document.getElementById('endDateFilter').value = validDates[validDates.length - 1];
+            }
+
+            ['clientFilter', 'countryFilter', 'statusFilter', 'startDateFilter', 'endDateFilter'].forEach(id => {
+                document.getElementById(id).addEventListener('change', applyFilters);
+            });
+
+            Chart.defaults.font.family = "'Inter', sans-serif";
+            Chart.defaults.color = "#64748b";
+
+            updateDashboard();
+        }
+
+        function populateSelect(id, options) {
+            const select = document.getElementById(id);
+            select.innerHTML = '<option value="">Todos</option>';
+            options.forEach(opt => select.appendChild(new Option(opt, opt)));
+        }
+
+        function applyFilters() {
+            const client = document.getElementById('clientFilter').value;
+            const country = document.getElementById('countryFilter').value;
+            const status = document.getElementById('statusFilter').value;
+            const startDate = document.getElementById('startDateFilter').value;
+            const endDate = document.getElementById('endDateFilter').value;
+
+            filteredData = rawData.filter(d => {
+                let dateValid = true;
+                if (d.SubmitDate) {
+                    if (startDate && d.SubmitDate < startDate) dateValid = false;
+                    if (endDate && d.SubmitDate > endDate) dateValid = false;
+                } else if (startDate || endDate) {
+                    dateValid = false;
+                }
+                return dateValid && (!client || d.CompanyName === client) && (!country || d.CountryRealName === country) && (!status || d.DLRStatus === status);
+            });
+
+            updateDashboard();
+        }
+
+        function resetFilters() {
+            document.getElementById('clientFilter').value = '';
+            document.getElementById('countryFilter').value = '';
+            document.getElementById('statusFilter').value = '';
+            const validDates = rawData.map(d => d.SubmitDate).filter(d => d).sort();
+            if (validDates.length > 0) {
+                document.getElementById('startDateFilter').value = validDates[0];
+                document.getElementById('endDateFilter').value = validDates[validDates.length - 1];
+            }
+            applyFilters();
+        }
+
+        function updateDashboard() {
+            updateKPIs();
+            updateCountryChart();
+            updateTrendChart();
+            updateClientTable();
+        }
+
+        function formatUSD(value) {
+            return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
+        }
+
+        function updateKPIs() {
+            const total = filteredData.length;
+            const delivered = filteredData.filter(d => d.DLRStatus === 'Delivered').length;
+            const deliveryRate = total > 0 ? (delivered / total * 100).toFixed(1) : 0;
+            const avgDelay = total > 0 ? (filteredData.reduce((acc, d) => acc + d.DLRDelay, 0) / total).toFixed(1) : 0;
+            const totalRevenue = filteredData.reduce((acc, d) => acc + d.ClientCostUSD, 0);
+            const totalCost = filteredData.reduce((acc, d) => acc + d.TerminationCostUSD, 0);
+            const margin = totalRevenue - totalCost;
+
+            document.getElementById('kpis').innerHTML = `
+                <div class="card kpi-card"><div class="kpi-label">Volumen Total</div><div class="kpi-value">${total.toLocaleString()}</div></div>
+                <div class="card kpi-card"><div class="kpi-label">Tasa de Entrega</div><div class="kpi-value" style="color: var(--success)">${deliveryRate}%</div></div>
+                <div class="card kpi-card"><div class="kpi-label">Latencia Promedio</div><div class="kpi-value" style="color: var(--warning)">${avgDelay}s</div></div>
+                <div class="card kpi-card"><div class="kpi-label">Ingresos Brutos</div><div class="kpi-value" style="color: var(--primary)">${formatUSD(totalRevenue)}</div></div>
+                <div class="card kpi-card"><div class="kpi-label">Costos de Operación</div><div class="kpi-value" style="color: var(--danger)">${formatUSD(totalCost)}</div></div>
+                <div class="card kpi-card"><div class="kpi-label">Margen Neto</div><div class="kpi-value" style="color: var(--success)">${formatUSD(margin)}</div></div>
+            `;
+        }
+
+        function updateCountryChart() {
+            const countryData = {};
+            filteredData.forEach(d => { countryData[d.CountryRealName] = (countryData[d.CountryRealName] || 0) + 1; });
+            const sorted = Object.entries(countryData).sort((a, b) => b[1] - a[1]).slice(0, 10);
+
+            if (charts.country) charts.country.destroy();
+            charts.country = new Chart(document.getElementById('countryChart'), {
+                type: 'bar',
+                data: { labels: sorted.map(d => d[0]), datasets: [{ label: 'Volumen', data: sorted.map(d => d[1]), backgroundColor: '#4f46e5', borderRadius: 4 }] },
+                options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+            });
+        }
+
+        function updateTrendChart() {
+            const dailyData = {};
+            filteredData.forEach(d => { if (d.SubmitDate) dailyData[d.SubmitDate] = (dailyData[d.SubmitDate] || 0) + 1; });
+            const sorted = Object.entries(dailyData).sort((a, b) => a[0].localeCompare(b[0]));
+
+            if (charts.trend) charts.trend.destroy();
+            const chartType = sorted.length <= 1 ? 'bar' : 'line';
+            charts.trend = new Chart(document.getElementById('trendChart'), {
+                type: chartType,
+                data: { labels: sorted.map(d => d[0]), datasets: [{ label: 'Volumen SMS', data: sorted.map(d => d[1]), borderColor: '#4f46e5', backgroundColor: 'rgba(79, 70, 229, 0.1)', borderWidth: 2, tension: 0.3, fill: true, pointBackgroundColor: '#ffffff', pointBorderColor: '#4f46e5' }] },
+                options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+            });
+        }
+
+        function updateClientTable() {
+            const clientData = {};
+            filteredData.forEach(d => {
+                const key = `${d.CompanyName}_${d.ClientCurrency}`;
+                if (!clientData[key]) clientData[key] = { company: d.CompanyName, currency: d.ClientCurrency, count: 0, revenueUSD: 0, costUSD: 0, delivered: 0 };
+                clientData[key].count++; clientData[key].revenueUSD += d.ClientCostUSD; clientData[key].costUSD += d.TerminationCostUSD;
+                if (d.DLRStatus === 'Delivered') clientData[key].delivered++;
+            });
+
+            const tbody = document.getElementById('clientTableBody');
+            tbody.innerHTML = '';
+            const sortedClients = Object.values(clientData).sort((a, b) => b.revenueUSD - a.revenueUSD);
+
+            sortedClients.forEach(d => {
+                const margin = d.revenueUSD - d.costUSD;
+                const marginPercent = d.revenueUSD > 0 ? (margin / d.revenueUSD * 100).toFixed(1) : 0;
+                const deliveryRate = (d.delivered / d.count * 100).toFixed(1);
+                const marginColor = margin >= 0 ? 'var(--success)' : 'var(--danger)';
+                
+                tbody.innerHTML += `
+                    <tr>
+                        <td style="font-weight: 500;">${d.company}</td>
+                        <td><span class="currency-badge ${d.currency.toLowerCase()}">${d.currency}</span></td>
+                        <td>${d.count.toLocaleString()}</td>
+                        <td>${formatUSD(d.revenueUSD)}</td>
+                        <td>${formatUSD(d.costUSD)}</td>
+                        <td style="color: ${marginColor}; font-weight: 600;">${formatUSD(margin)}</td>
+                        <td><span style="background: ${margin >= 0 ? '#dcfce7' : '#fee2e2'}; color: ${margin >= 0 ? '#166534' : '#991b1b'}; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: 600;">${marginPercent}%</span></td>
+                        <td>${deliveryRate}%</td>
+                    </tr>
+                `;
+            });
+        }
+    </script>
+</body>
+</html>
