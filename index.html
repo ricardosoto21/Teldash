@@ -7,96 +7,152 @@
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
-        :root { --bg: #0f172a; --card: #1e293b; --primary: #6366f1; --success: #10b981; --danger: #ef4444; --text: #f8fafc; }
+        :root { --bg: #0f172a; --card: #1e293b; --primary: #6366f1; --success: #10b981; --danger: #ef4444; --text: #f8fafc; --border: #334155; }
         body { background: var(--bg); color: var(--text); font-family: 'Inter', sans-serif; padding: 20px; }
         .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 30px; }
-        .card { background: var(--card); padding: 20px; border-radius: 12px; border: 1px solid #334155; text-align: center; }
-        .label { color: #94a3b8; font-size: 12px; text-transform: uppercase; margin-bottom: 10px; }
-        .val { font-size: 24px; font-weight: 700; }
-        .charts { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; background: var(--card); border-radius: 12px; overflow: hidden; }
-        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #334155; font-size: 14px; }
-        th { background: #2d3748; color: #94a3b8; }
+        .card { background: var(--card); padding: 20px; border-radius: 12px; border: 1px solid var(--border); }
+        .filter-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin-bottom: 25px; padding: 20px; background: #1e293b; border-radius: 12px; }
+        .input-group label { display: block; font-size: 11px; color: #94a3b8; text-transform: uppercase; margin-bottom: 8px; font-weight: 700; }
+        select, input { width: 100%; background: #0f172a; border: 1px solid var(--border); color: white; padding: 10px; border-radius: 8px; outline: none; }
+        .kpi-card { text-align: center; border-left: 4px solid var(--primary); }
+        .val { font-size: 24px; font-weight: 700; margin-top: 5px; }
+        .charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 20px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid var(--border); font-size: 13px; }
+        th { color: #94a3b8; font-weight: 600; text-transform: uppercase; font-size: 11px; }
+        #status { padding: 10px; margin-bottom: 20px; border-radius: 8px; font-size: 14px; text-align: center; }
     </style>
 </head>
 <body>
-    <h1>SMS Real-Time Analytics</h1>
-    <p id="status">Cargando base de datos histórica...</p>
-
-    <div class="grid" id="kpis"></div>
-
-    <div class="charts">
-        <div class="card"><h3>Top Destinos (SMS Reales)</h3><canvas id="chartCountry"></canvas></div>
-        <div class="card"><h3>Tendencia de Tráfico</h3><canvas id="chartTrend"></canvas></div>
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <h1>SMS Business Intelligence</h1>
+        <div id="status" style="background: var(--card); margin-bottom: 0;">Conectando con el histórico...</div>
     </div>
 
-    <div class="card" style="margin-top:20px">
-        <h3>Rentabilidad por Cliente</h3>
-        <table id="clientTable">
-            <thead><tr><th>Compañía</th><th>SMS Enviados</th><th>Ingresos (USD)</th><th>Costos (USD)</th><th>Margen</th><th>Efectividad</th></tr></thead>
-            <tbody></tbody>
+    <div class="card filter-grid">
+        <div class="input-group"><label>Desde</label><input type="date" id="start"></div>
+        <div class="input-group"><label>Hasta</label><input type="date" id="end"></div>
+        <div class="input-group"><label>Cliente</label><select id="client"></select></div>
+        <div class="input-group"><label>País</label><select id="country"></select></div>
+        <div class="input-group"><label>Operador</label><select id="operator"></select></div>
+    </div>
+
+    <div class="grid" id="kpi-container"></div>
+
+    <div class="charts">
+        <div class="card"><h3>Volumen Real por Destino</h3><canvas id="chartCountry"></canvas></div>
+        <div class="card"><h3>Tendencia Mensajes (Parts)</h3><canvas id="chartTrend"></canvas></div>
+    </div>
+
+    <div class="card" style="margin-top:20px; overflow-x: auto;">
+        <h3>Desglose Financiero por Cliente</h3>
+        <table>
+            <thead><tr><th>Compañía</th><th>Mensajes</th><th>Ingresos (USD)</th><th>Costos (USD)</th><th>Utilidad</th><th>DLR %</th></tr></thead>
+            <tbody id="table-body"></tbody>
         </table>
     </div>
 
     <script>
-        let raw = [];
+        let rawData = [];
         let charts = {};
 
-        fetch('datos/reporte_actual.xlsx').then(r => r.arrayBuffer()).then(buffer => {
-            const wb = XLSX.read(buffer, {type:'array'});
-            raw = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
-            document.getElementById('status').innerText = "Datos sincronizados correctamente.";
-            render();
+        window.addEventListener('DOMContentLoaded', async () => {
+            try {
+                const res = await fetch('datos/reporte_actual.xlsx');
+                const buffer = await res.arrayBuffer();
+                const wb = XLSX.read(buffer, { type: 'array' });
+                rawData = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
+                document.getElementById('status').innerText = "✅ Base de datos cargada: " + rawData.length + " grupos.";
+                init();
+            } catch (e) {
+                document.getElementById('status').innerText = "❌ Error: Archivo no encontrado";
+            }
         });
 
-        function render() {
-            // CÁLCULOS SUMANDO MessageParts (LO REAL)
-            const totalSMS = raw.reduce((s, d) => s + (d.MessageParts || 0), 0);
-            const totalRev = raw.reduce((s, d) => s + (d.ClientCostUSD || 0), 0);
-            const totalCost = raw.reduce((s, d) => s + (d.TerminationCostUSD || 0), 0);
-            const deliveredSMS = raw.filter(d => d.DLRStatus === 'Delivered').reduce((s, d) => s + (d.MessageParts || 0), 0);
-            
-            // PROMEDIO PESADO DE DELAY (Si existe la columna)
-            const totalDelay = raw.reduce((s, d) => s + ((d.DLRDelay || 0) * (d.MessageParts || 1)), 0);
-            const avgDelay = totalSMS > 0 ? (totalDelay / totalSMS).toFixed(2) : 0;
+        function init() {
+            const fill = (id, key) => {
+                const s = document.getElementById(id);
+                const items = [...new Set(rawData.map(d => d[key]))].sort();
+                s.innerHTML = '<option value="">Todos</option>';
+                items.forEach(i => s.appendChild(new Option(i, i)));
+            };
+            fill('client', 'CompanyName');
+            fill('country', 'CountryRealName');
+            fill('operator', 'OperatorName');
 
-            document.getElementById('kpis').innerHTML = `
-                <div class="card"><div class="label">SMS Reales</div><div class="val">${totalSMS.toLocaleString()}</div></div>
-                <div class="card"><div class="label">Entrega (DLR)</div><div class="val" style="color:var(--success)">${((deliveredSMS/totalSMS)*100).toFixed(1)}%</div></div>
-                <div class="card"><div class="label">Latencia Promedio</div><div class="val" style="color:#f59e0b">${avgDelay}s</div></div>
-                <div class="card"><div class="label">Utilidad Neta</div><div class="val" style="color:var(--success)">$${(totalRev - totalCost).toFixed(2)}</div></div>
-            `;
-
-            renderCharts();
-            renderTable();
+            ['start', 'end', 'client', 'country', 'operator'].forEach(id => {
+                document.getElementById(id).addEventListener('change', update);
+            });
+            update();
         }
 
-        function renderCharts() {
-            // Brazil y otros países sumando VOLUMEN
+        function update() {
+            const fStart = document.getElementById('start').value;
+            const fEnd = document.getElementById('end').value;
+            const fClient = document.getElementById('client').value;
+            const fCountry = document.getElementById('country').value;
+            const fOp = document.getElementById('operator').value;
+
+            const filtered = rawData.filter(d => {
+                return (!fStart || d.SubmitDate >= fStart) &&
+                       (!fEnd || d.SubmitDate <= fEnd) &&
+                       (!fClient || d.CompanyName === fClient) &&
+                       (!fCountry || d.CountryRealName === fCountry) &&
+                       (!fOp || d.OperatorName === fOp);
+            });
+
+            render(filtered);
+        }
+
+        function render(data) {
+            // MATEMÁTICA CORREGIDA: SUMA DE MessageParts Y USD
+            const vol = data.reduce((s, d) => s + (d.MessageParts || 0), 0);
+            const rev = data.reduce((s, d) => s + (d.ClientCostUSD || 0), 0);
+            const cost = data.reduce((s, d) => s + (d.TerminationCostUSD || 0), 0);
+            const delivered = data.filter(d => d.DLRStatus === 'Delivered').reduce((s, d) => s + (d.MessageParts || 0), 0);
+            
+            // Promedio pesado de Latencia
+            const totalDelay = data.reduce((s, d) => s + ((d.DLRDelay || 0) * (d.MessageParts || 1)), 0);
+            const avgDelay = vol > 0 ? (totalDelay / vol).toFixed(2) : 0;
+
+            document.getElementById('kpi-container').innerHTML = `
+                <div class="card kpi-card"><div class="label">Volumen Total</div><div class="val">${vol.toLocaleString()}</div></div>
+                <div class="card kpi-card"><div class="label">Tasa Entrega</div><div class="val" style="color:var(--success)">${vol > 0 ? ((delivered/vol)*100).toFixed(1) : 0}%</div></div>
+                <div class="card kpi-card"><div class="label">Latencia Promedio</div><div class="val" style="color:#f59e0b">${avgDelay}s</div></div>
+                <div class="card kpi-card"><div class="label">Utilidad Neta</div><div class="val" style="color:var(--success)">$${(rev - cost).toFixed(2)}</div></div>
+            `;
+
+            renderCharts(data);
+            renderTable(data);
+        }
+
+        function renderCharts(data) {
+            // TOP PAÍSES SUMANDO VOLUMEN REAL
             const countries = {};
-            raw.forEach(d => countries[d.CountryRealName] = (countries[d.CountryRealName] || 0) + (d.MessageParts || 0));
+            data.forEach(d => countries[d.CountryRealName] = (countries[d.CountryRealName] || 0) + (d.MessageParts || 0));
             const top = Object.entries(countries).sort((a,b) => b[1]-a[1]).slice(0,10);
 
             if(charts.c) charts.c.destroy();
             charts.c = new Chart(document.getElementById('chartCountry'), {
                 type: 'bar',
-                data: { labels: top.map(x=>x[0]), datasets: [{ label: 'Mensajes', data: top.map(x=>x[1]), backgroundColor: '#6366f1' }] }
+                data: { labels: top.map(x=>x[0]), datasets: [{ label: 'SMS Reales', data: top.map(x=>x[1]), backgroundColor: '#6366f1' }] }
             });
 
+            // TENDENCIA SUMANDO VOLUMEN REAL
             const trend = {};
-            raw.forEach(d => trend[d.SubmitDate] = (trend[d.SubmitDate] || 0) + (d.MessageParts || 0));
+            data.forEach(d => trend[d.SubmitDate] = (trend[d.SubmitDate] || 0) + (d.MessageParts || 0));
             const sorted = Object.entries(trend).sort((a,b) => a[0].localeCompare(b[0]));
 
             if(charts.t) charts.t.destroy();
             charts.t = new Chart(document.getElementById('chartTrend'), {
                 type: 'line',
-                data: { labels: sorted.map(x=>x[0]), datasets: [{ label: 'SMS', data: sorted.map(x=>x[1]), borderColor: '#10b981', tension: 0.3 }] }
+                data: { labels: sorted.map(x=>x[0]), datasets: [{ label: 'Tráfico (Parts)', data: sorted.map(x=>x[1]), borderColor: '#10b981', tension: 0.3 }] }
             });
         }
 
-        function renderTable() {
+        function renderTable(data) {
             const clients = {};
-            raw.forEach(d => {
+            data.forEach(d => {
                 if(!clients[d.CompanyName]) clients[d.CompanyName] = {v:0, r:0, c:0, d:0};
                 clients[d.CompanyName].v += (d.MessageParts || 0);
                 clients[d.CompanyName].r += (d.ClientCostUSD || 0);
@@ -104,17 +160,16 @@
                 if(d.DLRStatus === 'Delivered') clients[d.CompanyName].d += (d.MessageParts || 0);
             });
 
-            const html = Object.entries(clients).sort((a,b) => b[1].r - a[1].r).map(([name, d]) => `
+            document.getElementById('table-body').innerHTML = Object.entries(clients).sort((a,b) => b[1].r - a[1].r).map(([name, d]) => `
                 <tr>
                     <td><b>${name}</b></td>
                     <td>${d.v.toLocaleString()}</td>
                     <td>$${d.r.toFixed(2)}</td>
                     <td>$${d.c.toFixed(2)}</td>
                     <td style="color:var(--success)">$${(d.r - d.c).toFixed(2)}</td>
-                    <td>${((d.d / d.v)*100).toFixed(1)}%</td>
+                    <td>${d.v > 0 ? ((d.d / d.v)*100).toFixed(1) : 0}%</td>
                 </tr>
             `).join('');
-            document.querySelector('#clientTable tbody').innerHTML = html;
         }
     </script>
 </body>
