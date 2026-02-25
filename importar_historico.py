@@ -9,7 +9,6 @@ CLAVE = os.environ.get('SMS_PASS')
 DIAS_ATRAS = 365 
 RUTA_EXCEL = 'datos/reporte_actual.xlsx'
 
-# URLs
 URL_INICIO = 'http://65.108.69.39:5660/'
 URL_LOGIN = 'http://65.108.69.39:5660/Home/CheckLogin'
 URL_DESCARGA = 'http://65.108.69.39:5660/DLRWholesaleReport/DownloadExcel'
@@ -20,7 +19,7 @@ session.headers.update({'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)
 cache_tasas = {}
 
 def obtener_tasa_diaria(fecha_obj, moneda):
-    if not moneda or moneda == 'USD' or pd.isna(moneda): return 1.0
+    if not moneda or moneda == 'USD' or pd.isna(moneda) or str(moneda).strip() == "": return 1.0
     fecha_str = fecha_obj.strftime('%Y-%m-%d')
     key = f"{fecha_str}_{moneda}"
     if key in cache_tasas: return cache_tasas[key]
@@ -43,41 +42,56 @@ def obtener_tasa_diaria(fecha_obj, moneda):
 def convertir_y_agrupar_optimizado(df):
     if df.empty: return df
     
-    # 1. Identificar pares ÚNICOS de Fecha/Moneda para no repetir llamadas a la API
+    # 0. Mapeo flexible de columnas (por si el servidor cambia los nombres)
+    # Buscamos columnas de moneda
+    col_client_cur = 'CurrencyCode' if 'CurrencyCode' in df.columns else ('ClientCurrency' if 'ClientCurrency' in df.columns else None)
+    col_vendor_cur = 'TerminationCurrencyCode' if 'TerminationCurrencyCode' in df.columns else ('VendorCurrency' if 'VendorCurrency' in df.columns else None)
+    
+    # Si no existen, creamos las columnas como USD por defecto
+    if not col_client_cur: 
+        df['CurrencyCode'] = 'USD'
+        col_client_cur = 'CurrencyCode'
+    if not col_vendor_cur:
+        df['TerminationCurrencyCode'] = 'USD'
+        col_vendor_cur = 'TerminationCurrencyCode'
+
     df['TempDate'] = pd.to_datetime(df['SubmitDate']).dt.date
-    combinaciones = df[['TempDate', 'CurrencyCode', 'TerminationCurrencyCode']].drop_duplicates()
     
+    # 1. Identificar combinaciones únicas para consultar APIs una sola vez
+    combinaciones = df[['TempDate', col_client_cur, col_vendor_cur]].drop_duplicates()
     rates_map = {}
-    print(f"   💱 Calculando tasas para {len(combinaciones)} combinaciones únicas...", end="", flush=True)
     
-    for _, combo in combinaciones.iterrows():
-        d = combo['TempDate']
-        # Tasa Client
-        if (d, combo['CurrencyCode']) not in rates_map:
-            rates_map[(d, combo['CurrencyCode'])] = obtener_tasa_diaria(d, combo['CurrencyCode'])
-        # Tasa Vendor
-        if (d, combo['TerminationCurrencyCode']) not in rates_map:
-            rates_map[(d, combo['TerminationCurrencyCode'])] = obtener_tasa_diaria(d, combo['TerminationCurrencyCode'])
-
-    # 2. Mapeo instantáneo (en lugar de row-by-row apply)
-    df['ClientCostUSD'] = df.apply(lambda x: x['ClientCost'] * rates_map[(x['TempDate'], x['CurrencyCode'])], axis=1)
-    df['TerminationCostUSD'] = df.apply(lambda x: x['TerminationCost'] * rates_map[(x['TempDate'], x['TerminationCurrencyCode'])], axis=1)
-
-    # 3. Agrupación final
-    dimensiones = ['TempDate', 'CompanyName', 'SMPPAccountName', 'SMPPUsername', 'MCC', 'MNC', 'OperatorName', 'DLRStatus', 'ErrorDescription', 'VendorAccountName', 'SenderID', 'CountryRealName', 'CurrencyCode', 'TerminationCurrencyCode', 'SMSSource', 'SMSType', 'MessageType', 'ErrorCode']
-    cols = [c for c in dimensiones if c in df.columns]
+    print(f" (Tasas: {len(combinaciones)} comb.) ", end="", flush=True)
     
-    resumen = df.groupby(cols).agg({
+    for _, row in combinaciones.iterrows():
+        d = row['TempDate']
+        c_cur = row[col_client_cur]
+        v_cur = row[col_vendor_cur]
+        if (d, c_cur) not in rates_map: rates_map[(d, c_cur)] = obtener_tasa_diaria(d, c_cur)
+        if (d, v_cur) not in rates_map: rates_map[(d, v_cur)] = obtener_tasa_diaria(d, v_cur)
+
+    # 2. Aplicar conversión masiva
+    df['ClientCostUSD'] = df.apply(lambda x: x['ClientCost'] * rates_map[(x['TempDate'], x[col_client_cur])], axis=1)
+    df['TerminationCostUSD'] = df.apply(lambda x: x['TerminationCost'] * rates_map[(x['TempDate'], x[col_vendor_cur])], axis=1)
+
+    # 3. Agrupación final con todas las dimensiones operativas
+    dimensiones = ['TempDate', 'CompanyName', 'SMPPAccountName', 'SMPPUsername', 'MCC', 'MNC', 'OperatorName', 'DLRStatus', 'ErrorDescription', 'VendorAccountName', 'SenderID', 'CountryRealName', col_client_cur, col_vendor_cur, 'SMSSource', 'SMSType', 'MessageType', 'ErrorCode']
+    cols_actuales = [c for c in dimensiones if c in df.columns]
+    
+    resumen = df.groupby(cols_actuales).agg({
         'MessageParts': 'sum', 'ClientCost': 'sum', 'TerminationCost': 'sum',
         'ClientCostUSD': 'sum', 'TerminationCostUSD': 'sum'
     }).reset_index()
     
-    return resumen.rename(columns={'TempDate': 'SubmitDate'})
+    # Estandarizamos nombres para el dashboard
+    resumen = resumen.rename(columns={'TempDate': 'SubmitDate', col_client_cur: 'CurrencyCode', col_vendor_cur: 'TerminationCurrencyCode'})
+    return resumen
 
 def login():
     print("⏳ Iniciando sesión...", flush=True)
     r = session.get(URL_INICIO, timeout=20)
-    token = BeautifulSoup(r.text, 'html.parser').find('input', {'name': '__RequestVerificationToken'})['value']
+    soup = BeautifulSoup(r.text, 'html.parser')
+    token = soup.find('input', {'name': '__RequestVerificationToken'})['value']
     session.post(URL_LOGIN, data={'Username': USUARIO, 'UserKey': CLAVE, 'RememberMe': 'true', '__RequestVerificationToken': token}, 
                  headers={'RequestVerificationToken': token, 'X-Requested-With': 'XMLHttpRequest'}, timeout=20)
     print("✅ Conexión establecida.", flush=True)
@@ -95,24 +109,27 @@ if __name__ == "__main__":
         ini_str = f_ini.strftime('%Y-%m-%d 00:00:00')
         fin_str = f_fin.strftime('%Y-%m-%d 23:59:59')
         
-        print(f"📅 Rango: {f_ini.strftime('%Y-%m-%d')} al {f_fin.strftime('%Y-%m-%d')}...", flush=True)
+        print(f"📅 Rango: {f_ini.strftime('%Y-%m-%d')} al {f_fin.strftime('%Y-%m-%d')}... ", end="", flush=True)
         try:
-            # AGREGAMOS TIMEOUT AQUÍ PARA QUE NO SE CUELGUE (300 segundos = 5 minutos max)
             r = session.get(URL_DESCARGA, params={'StartDate': ini_str, 'EndDate': fin_str}, timeout=300)
             
             if "PK" in r.text[:10]:
                 df_semana = pd.read_excel(io.BytesIO(r.content))
                 if not df_semana.empty:
-                    all_data.append(convertir_y_agrupar_optimizado(df_semana))
-                    print(f" ✅ Procesado.", flush=True)
-                else: print(" ⚪ Sin datos.", flush=True)
-            else: print(" ❌ Respuesta inválida del servidor.", flush=True)
+                    # LOG DE COLUMNAS PARA DEPURAR SI FALLA
+                    # print(f" (Cols: {list(df_semana.columns)[:5]}...) ", end="")
+                    df_res = convertir_y_agrupar_optimizado(df_semana)
+                    all_data.append(df_res)
+                    print(f"✅ Ok.", flush=True)
+                else: print("⚪ Sin datos.", flush=True)
+            else: print("❌ Respuesta no Excel.", flush=True)
         except Exception as e:
-            print(f" ⚠️ Salto por error o timeout: {e}", flush=True)
+            print(f"⚠️ Salto por error: {e}", flush=True)
         
         fecha_cursor = f_ini - timedelta(seconds=1)
         time.sleep(2)
 
     if all_data:
+        print("\n⚙️ Unificando y guardando...", flush=True)
         pd.concat(all_data, ignore_index=True).to_excel(RUTA_EXCEL, index=False)
         print(f"🏆 ¡PROCESO EXITOSO!")
