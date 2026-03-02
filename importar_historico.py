@@ -42,6 +42,14 @@ def obtener_tasa_diaria(fecha_obj, moneda):
 def convertir_y_agrupar_optimizado(df):
     if df.empty: return df
     
+    # --- LA SOLUCIÓN: Estandarizar el nombre del Operador ---
+    if 'Operator' in df.columns and 'OperatorName' not in df.columns:
+        df = df.rename(columns={'Operator': 'OperatorName'})
+    # Si por alguna razón viene completamente vacía o sin operador, la creamos para que no falle
+    if 'OperatorName' not in df.columns:
+        df['OperatorName'] = 'Desconocido'
+    # --------------------------------------------------------
+
     df['SubmitDate'] = pd.to_datetime(df['SubmitDate']).dt.date
     
     col_client_cur = 'CurrencyCode' if 'CurrencyCode' in df.columns else ('ClientCurrency' if 'ClientCurrency' in df.columns else None)
