@@ -27,72 +27,113 @@
         tr:hover td { background: rgba(255,255,255,0.02); }
         #status-bar { padding: 8px 16px; border-radius: 20px; font-size: 12px; font-weight: 600; }
         .status-ok { background: rgba(16, 185, 129, 0.1); color: var(--success); }
+        
+        /* Estilos del Login */
+        #login-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--bg); z-index: 9999; display: flex; align-items: center; justify-content: center; }
+        #dashboard-content { display: none; }
+        .btn-login { background: var(--primary); color: white; border: none; padding: 12px; border-radius: 8px; width: 100%; cursor: pointer; font-weight: bold; font-size: 14px; transition: 0.2s; }
+        .btn-login:hover { background: #4f46e5; }
     </style>
 </head>
 <body>
-    <div class="header">
-        <div>
-            <h1>SMS Financial Control</h1>
-            <p style="color: #94a3b8">Datos históricos unificados y auditados en USD</p>
+
+    <div id="login-overlay">
+        <div class="card" style="width: 340px; text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.5);">
+            <h2 style="margin-bottom: 8px;">SMS Analytics</h2>
+            <p style="color: #94a3b8; font-size: 13px; margin-bottom: 24px;">Dashboard Privado</p>
+            <input type="password" id="pass-input" placeholder="Ingresa tu contraseña..." style="margin-bottom: 16px; text-align: center;">
+            <button onclick="verificarLogin()" class="btn-login">Acceder al Dashboard</button>
+            <p id="login-error" style="color: var(--danger); font-size: 12px; margin-top: 12px; display: none;">❌ Contraseña incorrecta</p>
         </div>
-        <div id="status-bar" class="status-ok">Sincronizando...</div>
     </div>
 
-    <div class="card filter-grid">
-        <div class="input-group"><label>Desde</label><input type="date" id="f-start"></div>
-        <div class="input-group"><label>Hasta</label><input type="date" id="f-end"></div>
-        <div class="input-group"><label>Cliente</label><select id="f-client"></select></div>
-        <div class="input-group"><label>País</label><select id="f-country"></select></div>
-        <div class="input-group"><label>Operador</label><select id="f-operator"></select></div>
-    </div>
+    <div id="dashboard-content">
+        <div class="header">
+            <div>
+                <h1>SMS Financial Control</h1>
+                <p style="color: #94a3b8">Datos históricos unificados y auditados en USD</p>
+            </div>
+            <div id="status-bar" class="status-ok">Sincronizando...</div>
+        </div>
 
-    <div class="kpi-grid" id="kpis"></div>
+        <div class="card filter-grid">
+            <div class="input-group"><label>Desde</label><input type="date" id="f-start"></div>
+            <div class="input-group"><label>Hasta</label><input type="date" id="f-end"></div>
+            <div class="input-group"><label>Cliente</label><select id="f-client"></select></div>
+            <div class="input-group"><label>País</label><select id="f-country"></select></div>
+            <div class="input-group"><label>Operador</label><select id="f-operator"></select></div>
+        </div>
 
-    <div class="charts-row">
-        <div class="card"><h3>Volumen Real por Destino (SMS Parts)</h3><canvas id="chartCountry"></canvas></div>
-        <div class="card"><h3>Tendencia de Tráfico Diaria</h3><canvas id="chartTrend"></canvas></div>
-    </div>
+        <div class="kpi-grid" id="kpis"></div>
 
-    <div class="card" style="overflow-x: auto;">
-        <h3>Desglose Financiero por Cliente</h3>
-        <table>
-            <thead>
-                <tr>
-                    <th>Compañía</th>
-                    <th>Mensajes (Total)</th>
-                    <th>Ingresos (USD)</th>
-                    <th>Costos (USD)</th>
-                    <th>Utilidad</th>
-                    <th>Margen %</th>
-                    <th>DLR %</th>
-                </tr>
-            </thead>
-            <tbody id="table-body"></tbody>
-        </table>
+        <div class="charts-row">
+            <div class="card"><h3>Volumen Real por Destino (SMS Parts)</h3><canvas id="chartCountry"></canvas></div>
+            <div class="card"><h3>Tendencia de Tráfico Diaria</h3><canvas id="chartTrend"></canvas></div>
+        </div>
+
+        <div class="card" style="overflow-x: auto;">
+            <h3>Desglose Financiero por Cliente</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Compañía</th><th>Mensajes (Total)</th><th>Ingresos (USD)</th>
+                        <th>Costos (USD)</th><th>Utilidad</th><th>Margen %</th><th>DLR %</th>
+                    </tr>
+                </thead>
+                <tbody id="table-body"></tbody>
+            </table>
+        </div>
     </div>
 
     <script>
         let rawData = [];
         let charts = {};
 
-        window.addEventListener('DOMContentLoaded', async () => {
+        // 1. SISTEMA DE LOGIN
+        window.addEventListener('DOMContentLoaded', () => {
+            if (sessionStorage.getItem('auth_token') === 'conectado') {
+                iniciarApp();
+            }
+            // Permitir Enter para loguearse
+            document.getElementById('pass-input').addEventListener('keypress', function (e) {
+                if (e.key === 'Enter') verificarLogin();
+            });
+        });
+
+        function verificarLogin() {
+            const pass = document.getElementById('pass-input').value;
+            if (pass === 'Telvoice$$2026') { // <--- CAMBIA TU CONTRASEÑA AQUÍ
+                sessionStorage.setItem('auth_token', 'conectado');
+                iniciarApp();
+            } else {
+                document.getElementById('login-error').style.display = 'block';
+            }
+        }
+
+        // 2. CARGA DE DATOS (Solo se ejecuta si el login es correcto)
+        async function iniciarApp() {
+            document.getElementById('login-overlay').style.display = 'none';
+            document.getElementById('dashboard-content').style.display = 'block';
+            
             try {
                 const res = await fetch('datos/reporte_actual.xlsx');
                 const buffer = await res.arrayBuffer();
                 const wb = XLSX.read(buffer, { type: 'array' });
-                rawData = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
+                // FIX FECHAS: raw: false obliga a JS a leer el Excel exactamente como texto visible (Ej: 2026-02-14)
+                rawData = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { raw: false });
                 document.getElementById('status-bar').innerText = "✅ " + rawData.length + " Grupos Cargados";
-                init();
+                initFilters();
             } catch (e) {
                 document.getElementById('status-bar').innerText = "❌ Error de Carga";
                 document.getElementById('status-bar').style.color = "var(--danger)";
             }
-        });
+        }
 
-        function init() {
+        function initFilters() {
             const fill = (id, key) => {
                 const s = document.getElementById(id);
-                const items = [...new Set(rawData.map(d => d[key]))].sort();
+                // Filtramos nulos para evitar errores
+                const items = [...new Set(rawData.map(d => d[key]).filter(Boolean))].sort();
                 s.innerHTML = '<option value="">Todos</option>';
                 items.forEach(i => s.appendChild(new Option(i, i)));
             };
@@ -101,12 +142,12 @@
             fill('f-operator', 'OperatorName');
 
             ['f-start', 'f-end', 'f-client', 'f-country', 'f-operator'].forEach(id => {
-                document.getElementById(id).addEventListener('change', update);
+                document.getElementById(id).addEventListener('change', updateDashboard);
             });
-            update();
+            updateDashboard();
         }
 
-        function update() {
+        function updateDashboard() {
             const start = document.getElementById('f-start').value;
             const end = document.getElementById('f-end').value;
             const client = document.getElementById('f-client').value;
@@ -125,17 +166,15 @@
         }
 
         function renderDashboard(data) {
-            // MATEMÁTICA REAL: SUMA DE MessageParts PARA VOLUMEN
-            const totalVol = data.reduce((s, d) => s + (d.MessageParts || 0), 0);
-            const totalRev = data.reduce((s, d) => s + (d.ClientCostUSD || 0), 0);
-            const totalCost = data.reduce((s, d) => s + (d.TerminationCostUSD || 0), 0);
+            const totalVol = data.reduce((s, d) => s + (Number(d.MessageParts) || 0), 0);
+            const totalRev = data.reduce((s, d) => s + (Number(d.ClientCostUSD) || 0), 0);
+            const totalCost = data.reduce((s, d) => s + (Number(d.TerminationCostUSD) || 0), 0);
             const totalProfit = totalRev - totalCost;
             
-            const delivered = data.filter(d => d.DLRStatus === 'Delivered').reduce((s, d) => s + (d.MessageParts || 0), 0);
+            const delivered = data.filter(d => d.DLRStatus === 'Delivered').reduce((s, d) => s + (Number(d.MessageParts) || 0), 0);
             const deliveryRate = totalVol > 0 ? (delivered / totalVol * 100).toFixed(1) : 0;
 
-            // Promedio pesado de latencia
-            const totalDelay = data.reduce((s, d) => s + ((d.DLRDelay || 0) * (d.MessageParts || 1)), 0);
+            const totalDelay = data.reduce((s, d) => s + ((Number(d.DLRDelay) || 0) * (Number(d.MessageParts) || 1)), 0);
             const avgDelay = totalVol > 0 ? (totalDelay / totalVol).toFixed(2) : 0;
 
             document.getElementById('kpis').innerHTML = `
@@ -150,9 +189,8 @@
         }
 
         function renderCharts(data) {
-            // Top Países (Brazil corregido)
             const countries = {};
-            data.forEach(d => countries[d.CountryRealName] = (countries[d.CountryRealName] || 0) + (d.MessageParts || 0));
+            data.forEach(d => { if(d.CountryRealName) countries[d.CountryRealName] = (countries[d.CountryRealName] || 0) + (Number(d.MessageParts) || 0); });
             const top = Object.entries(countries).sort((a,b) => b[1]-a[1]).slice(0,10);
 
             if(charts.c) charts.c.destroy();
@@ -162,10 +200,9 @@
                 options: { plugins: { legend: { display: false } }, scales: { y: { grid: { color: '#334155' } } } }
             });
 
-            // Tendencia
             const trend = {};
-            data.forEach(d => trend[d.SubmitDate] = (trend[d.SubmitDate] || 0) + (d.MessageParts || 0));
-            const sorted = Object.entries(trend).sort((a,b) => a[0].localeCompare(b[0]));
+            data.forEach(d => { if(d.SubmitDate) trend[d.SubmitDate] = (trend[d.SubmitDate] || 0) + (Number(d.MessageParts) || 0); });
+            const sorted = Object.entries(trend).sort((a,b) => a[0].localeCompare(b[0])); // Ordena las fechas alfanumericamente
 
             if(charts.t) charts.t.destroy();
             charts.t = new Chart(document.getElementById('chartTrend'), {
@@ -178,11 +215,12 @@
         function renderTable(data) {
             const clients = {};
             data.forEach(d => {
+                if(!d.CompanyName) return;
                 if(!clients[d.CompanyName]) clients[d.CompanyName] = {v:0, r:0, c:0, d:0};
-                clients[d.CompanyName].v += (d.MessageParts || 0);
-                clients[d.CompanyName].r += (d.ClientCostUSD || 0);
-                clients[d.CompanyName].c += (d.TerminationCostUSD || 0);
-                if(d.DLRStatus === 'Delivered') clients[d.CompanyName].d += (d.MessageParts || 0);
+                clients[d.CompanyName].v += (Number(d.MessageParts) || 0);
+                clients[d.CompanyName].r += (Number(d.ClientCostUSD) || 0);
+                clients[d.CompanyName].c += (Number(d.TerminationCostUSD) || 0);
+                if(d.DLRStatus === 'Delivered') clients[d.CompanyName].d += (Number(d.MessageParts) || 0);
             });
 
             document.getElementById('table-body').innerHTML = Object.entries(clients).sort((a,b) => b[1].r - a[1].r).map(([name, d]) => {
