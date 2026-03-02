@@ -89,12 +89,16 @@ if __name__ == "__main__":
     if not os.path.exists('datos'): os.makedirs('datos')
     login()
     all_data = []
-    fecha_cursor = datetime.now()
+    
+    # Trabajamos solo con las fechas (sin horas) para evitar el solapamiento
+    fecha_cursor = datetime.now().date() 
     fecha_limite = fecha_cursor - timedelta(days=DIAS_ATRAS)
 
     while fecha_cursor > fecha_limite:
         f_fin = fecha_cursor
-        f_ini = fecha_cursor - timedelta(days=6)
+        f_ini = fecha_cursor - timedelta(days=6) # Toma bloques de 7 días exactos
+        
+        # Formateamos los textos asegurando inicio y fin de día
         ini_str = f_ini.strftime('%Y-%m-%d 00:00:00')
         fin_str = f_fin.strftime('%Y-%m-%d 23:59:59')
         
@@ -112,7 +116,8 @@ if __name__ == "__main__":
         except Exception as e:
             print(f"⚠️ Salto por error: {e}", flush=True)
         
-        fecha_cursor = f_ini - timedelta(seconds=1)
+        # El cursor salta AL DÍA ANTERIOR del inicio del bloque actual
+        fecha_cursor = f_ini - timedelta(days=1)
         time.sleep(2)
 
     if all_data:
