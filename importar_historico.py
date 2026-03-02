@@ -19,7 +19,7 @@ session.headers.update({'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)
 cache_tasas = {}
 
 def obtener_tasa_diaria(fecha_obj, moneda):
-    if not moneda or moneda == 'USD' or pd.isna(moneda) or str(moneda).strip() == "": return 1.0
+    if not moneda or pd.isna(moneda) or str(moneda).strip() == "" or moneda == 'USD': return 1.0
     fecha_str = fecha_obj.strftime('%Y-%m-%d')
     key = f"{fecha_str}_{moneda}"
     if key in cache_tasas: return cache_tasas[key]
@@ -42,49 +42,30 @@ def obtener_tasa_diaria(fecha_obj, moneda):
 def convertir_y_agrupar_optimizado(df):
     if df.empty: return df
     
-    # 0. Mapeo flexible de columnas (por si el servidor cambia los nombres)
-    # Buscamos columnas de moneda
+    df['SubmitDate'] = pd.to_datetime(df['SubmitDate']).dt.date
+    
     col_client_cur = 'CurrencyCode' if 'CurrencyCode' in df.columns else ('ClientCurrency' if 'ClientCurrency' in df.columns else None)
     col_vendor_cur = 'TerminationCurrencyCode' if 'TerminationCurrencyCode' in df.columns else ('VendorCurrency' if 'VendorCurrency' in df.columns else None)
-    
-    # Si no existen, creamos las columnas como USD por defecto
-    if not col_client_cur: 
-        df['CurrencyCode'] = 'USD'
-        col_client_cur = 'CurrencyCode'
-    if not col_vendor_cur:
-        df['TerminationCurrencyCode'] = 'USD'
-        col_vendor_cur = 'TerminationCurrencyCode'
+    if not col_client_cur: df['CurrencyCode'] = 'USD'; col_client_cur = 'CurrencyCode'
+    if not col_vendor_cur: df['TerminationCurrencyCode'] = 'USD'; col_vendor_cur = 'TerminationCurrencyCode'
 
-    df['TempDate'] = pd.to_datetime(df['SubmitDate']).dt.date
-    
-    # 1. Identificar combinaciones únicas para consultar APIs una sola vez
-    combinaciones = df[['TempDate', col_client_cur, col_vendor_cur]].drop_duplicates()
-    rates_map = {}
-    
-    print(f" (Tasas: {len(combinaciones)} comb.) ", end="", flush=True)
-    
-    for _, row in combinaciones.iterrows():
-        d = row['TempDate']
-        c_cur = row[col_client_cur]
-        v_cur = row[col_vendor_cur]
-        if (d, c_cur) not in rates_map: rates_map[(d, c_cur)] = obtener_tasa_diaria(d, c_cur)
-        if (d, v_cur) not in rates_map: rates_map[(d, v_cur)] = obtener_tasa_diaria(d, v_cur)
+    # Limpieza DLRDelay
+    if 'DLRDelay' in df.columns:
+        df['DLRDelay'] = df['DLRDelay'].astype(str).str.extract(r'(\d+)').astype(float).fillna(0)
+    else:
+        df['DLRDelay'] = 0
 
-    # 2. Aplicar conversión masiva
-    df['ClientCostUSD'] = df.apply(lambda x: x['ClientCost'] * rates_map[(x['TempDate'], x[col_client_cur])], axis=1)
-    df['TerminationCostUSD'] = df.apply(lambda x: x['TerminationCost'] * rates_map[(x['TempDate'], x[col_vendor_cur])], axis=1)
+    df['ClientCostUSD'] = df.apply(lambda x: x['ClientCost'] * obtener_tasa_diaria(x['SubmitDate'], x[col_client_cur]), axis=1)
+    df['TerminationCostUSD'] = df.apply(lambda x: x['TerminationCost'] * obtener_tasa_diaria(x['SubmitDate'], x[col_vendor_cur]), axis=1)
 
-    # 3. Agrupación final con todas las dimensiones operativas
-    dimensiones = ['TempDate', 'CompanyName', 'SMPPAccountName', 'SMPPUsername', 'MCC', 'MNC', 'OperatorName', 'DLRStatus', 'ErrorDescription', 'VendorAccountName', 'SenderID', 'CountryRealName', col_client_cur, col_vendor_cur, 'SMSSource', 'SMSType', 'MessageType', 'ErrorCode']
-    cols_actuales = [c for c in dimensiones if c in df.columns]
-    
-    resumen = df.groupby(cols_actuales).agg({
-        'MessageParts': 'sum', 'ClientCost': 'sum', 'TerminationCost': 'sum',
-        'ClientCostUSD': 'sum', 'TerminationCostUSD': 'sum'
+    # Agrupación estricta para el Dashboard (elimina solapamientos internos)
+    resumen = df.groupby(['SubmitDate', 'CompanyName', 'CountryRealName', 'OperatorName', 'DLRStatus']).agg({
+        'MessageParts': 'sum', 
+        'ClientCostUSD': 'sum', 
+        'TerminationCostUSD': 'sum',
+        'DLRDelay': 'mean'
     }).reset_index()
     
-    # Estandarizamos nombres para el dashboard
-    resumen = resumen.rename(columns={'TempDate': 'SubmitDate', col_client_cur: 'CurrencyCode', col_vendor_cur: 'TerminationCurrencyCode'})
     return resumen
 
 def login():
@@ -112,12 +93,9 @@ if __name__ == "__main__":
         print(f"📅 Rango: {f_ini.strftime('%Y-%m-%d')} al {f_fin.strftime('%Y-%m-%d')}... ", end="", flush=True)
         try:
             r = session.get(URL_DESCARGA, params={'StartDate': ini_str, 'EndDate': fin_str}, timeout=300)
-            
             if "PK" in r.text[:10]:
                 df_semana = pd.read_excel(io.BytesIO(r.content))
                 if not df_semana.empty:
-                    # LOG DE COLUMNAS PARA DEPURAR SI FALLA
-                    # print(f" (Cols: {list(df_semana.columns)[:5]}...) ", end="")
                     df_res = convertir_y_agrupar_optimizado(df_semana)
                     all_data.append(df_res)
                     print(f"✅ Ok.", flush=True)
@@ -130,6 +108,13 @@ if __name__ == "__main__":
         time.sleep(2)
 
     if all_data:
-        print("\n⚙️ Unificando y guardando...", flush=True)
-        pd.concat(all_data, ignore_index=True).to_excel(RUTA_EXCEL, index=False)
-        print(f"🏆 ¡PROCESO EXITOSO!")
+        print("\n⚙️ Unificando y limpiando solapamientos finales...", flush=True)
+        df_completo = pd.concat(all_data, ignore_index=True)
+        
+        # Agrupación final maestra (Evita cualquier fila duplicada si los rangos de fecha se cruzaron)
+        df_maestro = df_completo.groupby(['SubmitDate', 'CompanyName', 'CountryRealName', 'OperatorName', 'DLRStatus']).agg({
+            'MessageParts': 'sum', 'ClientCostUSD': 'sum', 'TerminationCostUSD': 'sum', 'DLRDelay': 'mean'
+        }).reset_index()
+        
+        df_maestro.to_excel(RUTA_EXCEL, index=False)
+        print(f"🏆 ¡PROCESO EXITOSO! Base de datos comprimida a {len(df_maestro)} filas.")
