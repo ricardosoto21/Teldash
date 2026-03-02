@@ -18,9 +18,17 @@ session.headers.update({
 
 cache_tasas = {}
 
-def obtener_tasa_diaria(fecha_obj, moneda):
+def obtener_tasa_diaria(fecha_val, moneda):
     if not moneda or pd.isna(moneda) or str(moneda).strip() == "" or moneda == 'USD': return 1.0
-    fecha_str = fecha_obj.strftime('%Y-%m-%d')
+    
+    # Asegurar que manejamos la fecha siempre como string para evitar errores
+    if isinstance(fecha_val, str):
+        fecha_str = fecha_val
+        fecha_obj = datetime.strptime(fecha_val, '%Y-%m-%d')
+    else:
+        fecha_str = fecha_val.strftime('%Y-%m-%d')
+        fecha_obj = fecha_val
+        
     key = f"{fecha_str}_{moneda}"
     if key in cache_tasas: return cache_tasas[key]
     
@@ -36,8 +44,10 @@ def obtener_tasa_diaria(fecha_obj, moneda):
         else: tasa = 1.0
         cache_tasas[key] = tasa
         return tasa
-    except:
-        return {'EUR': 1.08, 'CLP': 0.0011}.get(moneda, 1.0)
+    except Exception as e:
+        # PARADA DE EMERGENCIA: Si no hay tasa, se detiene el proceso para no generar costos en cero.
+        print(f"\n❌ ERROR CRÍTICO: Falló la API de divisas para {moneda} el {fecha_str}. Detalle: {e}", flush=True)
+        raise SystemExit(f"Ejecución detenida intencionalmente para proteger la integridad de los datos financieros.")
 
 def login():
     print("⏳ Entrando al sistema...", flush=True)
