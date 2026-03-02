@@ -67,6 +67,13 @@ def ejecutar_actualizacion():
         print("⚪ No hubo tráfico ayer. Nada que agregar.", flush=True)
         return
     
+    # --- LA SOLUCIÓN: Estandarizar el nombre del Operador ---
+    if 'Operator' in df.columns and 'OperatorName' not in df.columns:
+        df = df.rename(columns={'Operator': 'OperatorName'})
+    if 'OperatorName' not in df.columns:
+        df['OperatorName'] = 'Desconocido'
+    # --------------------------------------------------------
+    
     # 1. Preparar Columnas Base
     df['SubmitDate'] = pd.to_datetime(df['SubmitDate']).dt.date
     col_client_cur = 'CurrencyCode' if 'CurrencyCode' in df.columns else ('ClientCurrency' if 'ClientCurrency' in df.columns else None)
