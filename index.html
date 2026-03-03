@@ -100,9 +100,23 @@
             });
         });
 
-        function verificarLogin() {
+async function verificarLogin() {
             const pass = document.getElementById('pass-input').value;
-            if (pass === 'Telvoice$$2026') { // <--- CAMBIA TU CONTRASEÑA AQUÍ
+            
+            // 1. Convertimos el texto ingresado a formato de bytes
+            const encoder = new TextEncoder();
+            const data = encoder.encode(pass);
+            
+            // 2. Calculamos el hash SHA-256 (La huella digital)
+            const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+            const hashArray = Array.from(new Uint8Array(hashBuffer));
+            const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+
+            // 3. Este es el Hash de "admin123". 
+            // ¡Si alguien lee el código, solo verá esta mezcla de letras y números!
+            const hashCorrecto = "3dee844db43ec181d33192c610e6e5f46d9c7c5c62dbddabc83d6c087e4e7312";
+
+            if (hashHex === hashCorrecto) {
                 sessionStorage.setItem('auth_token', 'conectado');
                 iniciarApp();
             } else {
