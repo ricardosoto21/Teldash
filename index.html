@@ -112,9 +112,9 @@ async function verificarLogin() {
             const hashArray = Array.from(new Uint8Array(hashBuffer));
             const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 
-            // 3. Este es el Hash de "admin123". 
-            // ¡Si alguien lee el código, solo verá esta mezcla de letras y números!
-            const hashCorrecto = "3dee844db43ec181d33192c610e6e5f46d9c7c5c62dbddabc83d6c087e4e7312";
+
+    
+            const hashCorrecto = "7a8e9c7e13fae362650b897ca870ac03fbdcda0f64e25f2ff5ab7134fb7087c9";
 
             if (hashHex === hashCorrecto) {
                 sessionStorage.setItem('auth_token', 'conectado');
