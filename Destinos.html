@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SMS Rates - Smart Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f0f2f5; color: #1c1e21; }
+        .header-bg { background: linear-gradient(135deg, #1e3c72, #2a5298); color: white; padding: 40px 0 30px; margin-bottom: 30px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        
+        /* Estilos de las Tarjetas */
+        .country-card { transition: transform 0.2s, box-shadow 0.2s; cursor: pointer; border: none; border-radius: 12px; }
+        .country-card:hover { transform: translateY(-5px); box-shadow: 0 10px 20px rgba(0,0,0,0.1) !important; border-color: #2a5298; }
+        .card-title { font-weight: 800; font-size: 1.2rem; color: #333; }
+        .badge-providers { font-size: 0.85rem; padding: 8px 12px; border-radius: 20px; }
+        
+        /* Buscadores y Filtros */
+        .search-box { border-radius: 20px; padding: 10px 20px; border: 1px solid #ddd; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        
+        /* Modal (Detalle) */
+        .modal-header { background-color: #f8f9fa; border-bottom: 2px solid #e9ecef; }
+        .table-details th { background-color: #f1f3f5; font-size: 0.85rem; text-transform: uppercase; color: #6c757d; }
+        .table-details td { vertical-align: middle; font-size: 0.95rem; }
+        .precio-desde { font-size: 0.8rem; color: #6c757d; font-weight: normal; margin-right: 4px; }
+    </style>
+</head>
+<body>
+
+<div class="header-bg text-center">
+    <div class="container">
+        <h1 class="fw-bold">🌍 Cobertura Global SMS</h1>
+        <p class="lead opacity-75">Selecciona un país para ver las rutas y tarifas disponibles</p>
+    </div>
+</div>
+
+<div class="container mb-5">
+    
+    <div class="row mb-4 justify-content-center">
+        <div class="col-md-5 mb-2">
+            <input type="text" id="searchCountry" class="form-control search-box" placeholder="🔍 Buscar País (Ej. Chile, Spain)...">
+        </div>
+        <div class="col-md-4 mb-2">
+            <select id="filterProvider" class="form-select search-box">
+                <option value="ALL">🏢 Todos los Proveedores</option>
+                </select>
+        </div>
+    </div>
+
+    <div id="loading" class="text-center my-5">
+        <div class="spinner-border text-primary" style="width: 3rem; height: 3rem;" role="status"></div>
+        <p class="mt-3 text-muted fw-bold">Sincronizando rutas y banderas...</p>
+    </div>
+
+    <div class="row" id="cardsContainer">
+        </div>
+</div>
+
+<div class="modal fade" id="countryModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header d-flex justify-content-between align-items-center">
+                <h4 class="modal-title fw-bold mb-0" id="modalCountryName">País</h4>
+                <div>
+                    <button id="toggleOpBtn" class="btn btn-sm btn-outline-primary me-3" onclick="toggleOperadores()">Ver detalle por Operador</button>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+            </div>
+            <div class="modal-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover table-details mb-0">
+                        <thead id="modalTableHead">
+                            </thead>
+                        <tbody id="modalTableBody">
+                            </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer bg-light">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+    // 🔴 PEGA AQUÍ TU URL DE APPS SCRIPT (Asegúrate de que empiece con https://)
+    const API_URL = "https://script.google.com/macros/s/AKfycbxAs45hYUlPGmCyY4FijgoEa6ZfogMh3WOqQHUvc3FOUt_mhNtLaywoAZdibGVq7gob/exec"; 
+    
+    let globalData = {}; 
+    let allProviders = new Set(); 
+    let banderasISO = {}; 
+    
+    // Variables para controlar la vista del Modal
+    let paisActualModal = "";
+    let vistaDetallada = false;
+
+    $(document).ready(function() {
+        // 1. Cargar Banderas
+        fetch('https://restcountries.com/v3.1/all?fields=name,cca2')
+            .then(res => res.json())
+            .then(paisesMundo => {
+                paisesMundo.forEach(p => {
+                    banderasISO[p.name.common.toLowerCase()] = p.cca2.toLowerCase();
+                    if(p.name.official) banderasISO[p.name.official.toLowerCase()] = p.cca2.toLowerCase();
+                });
+                banderasISO["usa"] = "us"; banderasISO["uk"] = "gb"; 
+                banderasISO["vietnam"] = "vn"; banderasISO["venezuela"] = "ve"; 
+                banderasISO["russia"] = "ru";
+
+                // 2. Cargar datos de tu Google Sheet
+                return fetch(API_URL);
+            })
+            .then(res => res.json())
+            .then(data => {
+                document.getElementById('loading').style.display = 'none';
+                procesarDatos(data);
+                renderizarTarjetas();
+                llenarFiltroProveedores();
+            })
+            .catch(err => {
+                console.error("Error en la descarga:", err);
+                document.getElementById('loading').innerHTML = '<div class="alert alert-danger shadow">Error al conectar con la base de datos. Revisa la consola o asegúrate de que pegaste bien tu API_URL.</div>';
+            });
+
+        $('#searchCountry').on('keyup', filtrarTarjetas);
+        $('#filterProvider').on('change', filtrarTarjetas);
+    });
+
+    function procesarDatos(data) {
+        data.forEach(row => {
+            const pais = row.pais || "Desconocido";
+            const proveedor = row.proveedor || "Sin Nombre";
+            allProviders.add(proveedor);
+
+            if (!globalData[pais]) {
+                globalData[pais] = { nombre: pais, proveedores: new Set(), rutas: [] };
+            }
+            globalData[pais].proveedores.add(proveedor);
+            globalData[pais].rutas.push(row);
+        });
+    }
+
+    function renderizarTarjetas() {
+        const container = $('#cardsContainer');
+        container.empty();
+        const paisesOrdenados = Object.keys(globalData).sort();
+
+        paisesOrdenados.forEach(nombrePais => {
+            const info = globalData[nombrePais];
+            const numProveedores = info.proveedores.size;
+            const listaProveedores = Array.from(info.proveedores).join(','); 
+
+            const nombreNormalizado = nombrePais.toLowerCase().trim();
+            const codigoIso = banderasISO[nombreNormalizado];
+            
+            const flagHTML = codigoIso 
+                ? `<img src="https://flagcdn.com/w40/${codigoIso}.png" width="40" alt="${nombrePais}" class="mb-3 rounded shadow-sm">` 
+                : `<div class="mb-2" style="font-size: 2rem;">🌐</div>`;
+
+            const cardHTML = `
+                <div class="col-xl-3 col-lg-4 col-md-6 col-sm-6 mb-4 card-item" 
+                     data-pais="${nombreNormalizado}" 
+                     data-proveedores="${listaProveedores.toLowerCase()}">
+                    <div class="card country-card h-100 shadow-sm" onclick="abrirDetalle('${nombrePais}')">
+                        <div class="card-body text-center d-flex flex-column justify-content-center">
+                            ${flagHTML}
+                            <h5 class="card-title mb-3">${nombrePais}</h5>
+                            <div>
+                                <span class="badge bg-success badge-providers">
+                                    ${numProveedores} Proveedor${numProveedores > 1 ? 'es' : ''}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            container.append(cardHTML);
+        });
+    }
+
+    function llenarFiltroProveedores() {
+        const select = $('#filterProvider');
+        Array.from(allProviders).sort().forEach(prov => {
+            select.append(`<option value="${prov.toLowerCase()}">${prov}</option>`);
+        });
+    }
+
+    function filtrarTarjetas() {
+        const textoBuscar = $('#searchCountry').val().toLowerCase();
+        const provFiltro = $('#filterProvider').val();
+
+        $('.card-item').each(function() {
+            const paisCard = $(this).data('pais');
+            const provsCard = $(this).data('proveedores');
+
+            const coincideTexto = paisCard.includes(textoBuscar);
+            const coincideProv = (provFiltro === "ALL") || provsCard.includes(provFiltro);
+
+            if (coincideTexto && coincideProv) {
+                $(this).show();
+            } else {
+                $(this).hide();
+            }
+        });
+    }
+
+    // --- NUEVA LÓGICA DEL MODAL (Resumen vs Detalle) --- //
+
+    function abrirDetalle(nombrePais) {
+        paisActualModal = nombrePais;
+        vistaDetallada = false; // Por defecto arrancamos en modo Limpio/Resumen
+        
+        // Resetear visualmente el botón
+        $('#toggleOpBtn').text('Ver detalle por Operador').removeClass('btn-primary').addClass('btn-outline-primary');
+        
+        renderizarTablaModal();
+
+        const modalEl = document.getElementById('countryModal');
+        const myModal = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
+        myModal.show();
+    }
+
+    function toggleOperadores() {
+        vistaDetallada = !vistaDetallada; // Invertir el estado
+        
+        if(vistaDetallada) {
+            $('#toggleOpBtn').text('Ocultar Operadores').removeClass('btn-outline-primary').addClass('btn-primary');
+        } else {
+            $('#toggleOpBtn').text('Ver detalle por Operador').removeClass('btn-primary').addClass('btn-outline-primary');
+        }
+        
+        renderizarTablaModal(); // Redibujar la tabla
+    }
+
+    function renderizarTablaModal() {
+        const info = globalData[paisActualModal];
+        const codigoIso = banderasISO[paisActualModal.toLowerCase().trim()];
+        const flagImg = codigoIso ? `<img src="https://flagcdn.com/w40/${codigoIso}.png" width="30" class="me-2 rounded">` : '';
+        
+        $('#modalCountryName').html(`${flagImg} Rutas para: ${paisActualModal}`);
+        
+        const thead = $('#modalTableHead');
+        const tbody = $('#modalTableBody');
+        thead.empty();
+        tbody.empty();
+
+        if (vistaDetallada) {
+            // VISTA DETALLADA CON OPERADORES
+            thead.html(`
+                <tr>
+                    <th>Proveedor</th>
+                    <th>Ruta</th>
+                    <th>Operador</th>
+                    <th>MCC-MNC</th>
+                    <th>Tarifa</th>
+                    <th>Moneda</th>
+                </tr>
+            `);
+
+            const rutasOrdenadas = info.rutas.sort((a, b) => {
+                if (a.proveedor === b.proveedor) return parseFloat(a.tarifa) - parseFloat(b.tarifa);
+                return a.proveedor.localeCompare(b.proveedor);
+            });
+
+            rutasOrdenadas.forEach(ruta => {
+                const badgeColor = ruta.moneda.toUpperCase().includes('USD') ? 'bg-success' : 'bg-info text-dark';
+                tbody.append(`
+                    <tr>
+                        <td class="fw-bold text-primary">${ruta.proveedor}</td>
+                        <td><span class="badge bg-secondary">${ruta.ruta || 'N/A'}</span></td>
+                        <td>${ruta.operador || 'Todos'}</td>
+                        <td><small class="text-muted">${ruta.mcc || '000'} - ${ruta.mnc || '00'}</small></td>
+                        <td class="fw-bold fs-5">${parseFloat(ruta.tarifa).toFixed(4)}</td>
+                        <td><span class="badge ${badgeColor}">${ruta.moneda}</span></td>
+                    </tr>
+                `);
+            });
+
+        } else {
+            // VISTA LIMPIA (Agrupada por Proveedor + Ruta)
+            thead.html(`
+                <tr>
+                    <th>Proveedor</th>
+                    <th>Ruta</th>
+                    <th>Tarifa</th>
+                    <th>Moneda</th>
+                </tr>
+            `);
+
+            // Agrupar los datos buscando precios mínimos y máximos por ruta
+            let resumen = {};
+            info.rutas.forEach(ruta => {
+                // La llave única es la combinación de Proveedor + Ruta + Moneda
+                const key = `${ruta.proveedor}_${ruta.ruta}_${ruta.moneda}`;
+                const tarifa = parseFloat(ruta.tarifa);
+                
+                if (!resumen[key]) {
+                    resumen[key] = {
+                        proveedor: ruta.proveedor,
+                        ruta: ruta.ruta,
+                        moneda: ruta.moneda,
+                        minTarifa: tarifa,
+                        maxTarifa: tarifa
+                    };
+                } else {
+                    if (tarifa < resumen[key].minTarifa) resumen[key].minTarifa = tarifa;
+                    if (tarifa > resumen[key].maxTarifa) resumen[key].maxTarifa = tarifa;
+                }
+            });
+
+            // Convertir el resumen a array y ordenarlo por Proveedor y Precio
+            const resumenArray = Object.values(resumen).sort((a, b) => {
+                if (a.proveedor === b.proveedor) return a.minTarifa - b.minTarifa;
+                return a.proveedor.localeCompare(b.proveedor);
+            });
+
+            resumenArray.forEach(res => {
+                const badgeColor = res.moneda.toUpperCase().includes('USD') ? 'bg-success' : 'bg-info text-dark';
+                
+                // Si el precio mínimo es igual al máximo, la tarifa es plana. Si no, le agregamos un "Desde"
+                let precioDisplay = res.minTarifa === res.maxTarifa 
+                    ? parseFloat(res.minTarifa).toFixed(4)
+                    : `<span class="precio-desde">Desde</span>${parseFloat(res.minTarifa).toFixed(4)}`;
+
+                tbody.append(`
+                    <tr>
+                        <td class="fw-bold text-primary">${res.proveedor}</td>
+                        <td><span class="badge bg-secondary">${res.ruta || 'N/A'}</span></td>
+                        <td class="fw-bold fs-5">${precioDisplay}</td>
+                        <td><span class="badge ${badgeColor}">${res.moneda}</span></td>
+                    </tr>
+                `);
+            });
+        }
+    }
+</script>
+</body>
+</html>
