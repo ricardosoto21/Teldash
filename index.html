@@ -33,6 +33,26 @@
         #dashboard-content { display: none; }
         .btn-login { background: var(--primary); color: white; border: none; padding: 12px; border-radius: 8px; width: 100%; cursor: pointer; font-weight: bold; font-size: 14px; transition: 0.2s; }
         .btn-login:hover { background: #4f46e5; }
+
+        /* Botón de Cobertura Global */
+        .btn-destinos {
+            background: rgba(99, 102, 241, 0.1);
+            color: var(--primary);
+            border: 1px solid var(--primary);
+            padding: 8px 16px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-size: 13px;
+            font-weight: 600;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .btn-destinos:hover {
+            background: var(--primary);
+            color: white;
+        }
     </style>
 </head>
 <body>
@@ -48,12 +68,17 @@
     </div>
 
     <div id="dashboard-content">
-        <div class="header">
+     <div class="header">
             <div>
                 <h1>SMS Financial Control</h1>
                 <p style="color: #94a3b8">Datos históricos unificados y auditados en USD</p>
             </div>
-            <div id="status-bar" class="status-ok">Sincronizando...</div>
+            <div style="display: flex; gap: 16px; align-items: center;">
+                <a href="Destinos.html" target="_blank" class="btn-destinos">
+                    🌍 Ver Cobertura y Tarifas
+                </a>
+                <div id="status-bar" class="status-ok">Sincronizando...</div>
+            </div>
         </div>
 
         <div class="card filter-grid">
