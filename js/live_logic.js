@@ -1,96 +1,95 @@
-// --- CONFIGURACIÓN DE COLUMNAS (Ajustado a tu proveedor) ---
-const COL_MSG = 'Message'; 
+// --- 🛠️ CONFIGURACIÓN MANUAL DE COLUMNAS (Mapeo Seguro) ---
+const colMap = {
+    // Pon aquí el NOMBRE EXACTO de la columna que quieres leer del Excel
+    hora: 'SubmitDate', 
+    numero: 'PhoneNumber', 
+    operador: 'Operator',
+    vendor: 'CompanyName',
+    ruta: 'SMPPAccountName',
+    status: 'DLRStatus', 
+    mensaje: 'SMSMessage',
+    delay: 'delay'
+};
 
 // Función para cerrar el modal
 function closeLive() {
     document.getElementById('liveModal').style.display = 'none';
 }
 
-// Cierra el modal si haces clic fuera de él
+// Cierra el modal si haces clic fuera
 window.onclick = function(event) {
     const modal = document.getElementById('liveModal');
-    if (event.target == modal) {
-        closeLive();
-    }
+    if (event.target == modal) closeLive();
 }
 
-// Descarga y filtra el Excel de tráfico en vivo
 async function showLiveTraffic(pais) {
     const modal = document.getElementById('liveModal');
     const title = document.getElementById('live-title');
     const tbody = document.querySelector('#live-table tbody');
 
     modal.style.display = 'block';
-    title.innerHTML = `<span class="material-icons-outlined" style="color: #ef4444; animation: pulse 1.5s infinite;">sensors</span> Tráfico Reciente: ${pais}`;
-    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding: 30px;">Cargando registros del servidor... ⏳</td></tr>';
+    title.innerHTML = `📡 Tráfico en Vivo: ${pais}`;
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding: 20px;">Cargando registros...⏳</td></tr>';
 
     try {
-        // Añadimos un timestamp para evitar la caché del navegador
-        const res = await fetch(`datos/live_traffic.xlsx?t=${new Date().getTime()}`);
+        // Obtenemos la ruta correcta (datos/live_traffic.xlsx está en la raíz)
+        const rutaDatos = "datos/live_traffic.xlsx"; // Si estás en index.html o Destinos.html, esta es la ruta
+        
+        // Cache busting con timestamp
+        const res = await fetch(`${rutaDatos}?t=${new Date().getTime()}`);
         if (!res.ok) throw new Error("Archivo no encontrado");
         
         const buffer = await res.arrayBuffer();
         const wb = XLSX.read(buffer, { type: 'array' });
         const liveData = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
 
+        // Filtramos por país
         const filtered = liveData.filter(d => d.CountryRealName === pais);
         
         if (filtered.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding: 20px;">No hay tráfico registrado en las últimas horas para este destino.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding: 20px;">No hay registros recientes para este país.</td></tr>';
             return;
         }
 
-        tbody.innerHTML = filtered.map(d => {
-            const msg = d[COL_MSG] || d.SMSMessage || d.Text || 'Sin contenido';
-            const hora = d.SubmitDate ? d.SubmitDate.toString().split(' ')[1] : '--:--';
-            
-            // Colores dinámicos para el status basados en tus variables CSS o colores fijos
-            let statusColor = '#94a3b8'; // default gris
-            if(d.DLRStatus === 'Delivered') statusColor = '#10b981'; // success verde
-            else if(d.DLRStatus === 'Undelivered' || d.DLRStatus === 'Failed' || d.DLRStatus === 'Rejected') statusColor = '#ef4444'; // danger rojo
+// --- 🛠️ GENERACIÓN DE FILAS ---
+tbody.innerHTML = filtered.map(d => {
+    // Extraemos los datos usando tus llaves manuales
+    const horaRaw = d[colMap.hora] || '--:--:--';
+    const horaSms = horaRaw.toString().split(' ')[1] || horaRaw;
+    const numeroSms = d[colMap.numero] || 'N/A';
+    const operadorSms = d[colMap.operador] || 'N/A';
+    const vendorSms = d[colMap.vendor] || 'N/A'; // Nueva columna
+    const rutaSms = d[colMap.ruta] || 'N/A';     // Nueva columna
+    const statusSms = d[colMap.status] || 'Unknown';
+    const mensajeSms = d[colMap.mensaje] || 'Sin contenido';
+    const delaySms = d[colMap.delay] || '0s';    // Nueva columna
 
-            return `
-                <tr>
-                    <td>${hora}</td>
-                    <td style="font-family: monospace; font-size: 14px;">${d.PhoneNumber || d.Destination || 'N/A'}</td>
-                    <td>${d.OperatorName || 'N/A'}</td>
-                    <td>
-                        <span style="background: ${statusColor}20; color: ${statusColor}; padding: 4px 8px; border-radius: 6px; font-weight: bold; font-size: 11px;">
-                            ${d.DLRStatus}
-                        </span>
-                    </td>
-                    <td title="${msg}" style="max-width: 300px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: help;">
-                        ${msg}
-                    </td>
-                </tr>
-            `;
-        }).join('');
+    // Color del status
+    let statusColor = '#94a3b8';
+    if(statusSms === 'Delivered') statusColor = '#10b981';
+    else if(['Undelivered','Failed','Rejected'].includes(statusSms)) statusColor = '#ef4444';
+
+    return `
+        <tr>
+            <td>${horaSms}</td>
+            <td style="font-family: monospace;">${numeroSms}</td>
+            <td>${operadorSms}</td>
+            <td style="font-size: 11px;">${vendorSms}</td>
+            <td style="font-size: 11px; color: var(--primary-color);">${rutaSms}</td>
+            <td>
+                <span style="background: ${statusColor}20; color: ${statusColor}; padding: 4px 8px; border-radius: 6px; font-weight: bold; font-size: 11px;">
+                    ${statusSms}
+                </span>
+            </td>
+            <td>${delaySms}</td>
+            <td title="${mensajeSms}" style="max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: help; font-size: 11px;">
+                ${mensajeSms}
+            </td>
+        </tr>
+    `;
+}).join('');
     } catch (e) {
         console.error("Error cargando live traffic:", e);
-        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:#ef4444; padding: 20px;">Error: No se encontró el archivo datos/live_traffic.xlsx. ¿Ya se ejecutó el bot de Live Traffic?</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:#ef4444; padding: 20px;">Error: No se pudo cargar el archivo en vivo datos/live_traffic.xlsx.</td></tr>';
     }
 }
-
-// --- VINCULACIÓN "NINJA" CON TU GRÁFICO EXISTENTE ---
-function bindChartClick() {
-    // Busca si 'charts' y 'charts.c' (tu gráfico de barras) ya fueron creados por index.html
-    if (window.charts && window.charts.c) {
-        // Le inyectamos el evento onclick a las opciones del gráfico
-        window.charts.c.options.onClick = (e, elements) => {
-            if (elements.length > 0) {
-                const index = elements[0].index;
-                const pais = window.charts.c.data.labels[index];
-                showLiveTraffic(pais);
-            }
-        };
-        // Refrescamos el gráfico para que aplique el evento
-        window.charts.c.update();
-        console.log("✅ Conexión Live-Chart establecida.");
-    } else {
-        // Si el gráfico aún no renderiza, vuelve a intentar en 500ms
-        setTimeout(bindChartClick, 500);
-    }
-}
-
-// Iniciar la vinculación cuando cargue el archivo
-bindChartClick();
