@@ -280,37 +280,6 @@ async function verificarLogin() {
             }).join('');
         }
     </script>
-    <style>
-        .live-modal { display: none; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.7); backdrop-filter: blur(4px); }
-        .live-modal-content { background-color: var(--card-bg); margin: 5% auto; padding: 24px; border: 1px solid var(--border-color); width: 90%; max-width: 1100px; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); position: relative; animation: slideDown 0.3s ease-out; }
-        @keyframes slideDown { from { transform: translateY(-20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-        .close-live { position: absolute; top: 20px; right: 24px; color: #ef4444; font-size: 28px; font-weight: bold; cursor: pointer; transition: 0.2s; }
-        .close-live:hover { color: #dc2626; transform: scale(1.1); }
-        .live-table-container { overflow-y: auto; max-height: 500px; margin-top: 20px; border-radius: 8px; border: 1px solid var(--border-color); }
-        .live-table-container table { width: 100%; border-collapse: collapse; }
-        .live-table-container th { position: sticky; top: 0; background-color: var(--sidebar-bg); z-index: 10; padding: 12px; font-size: 12px; text-transform: uppercase; color: var(--text-muted); }
-        .live-table-container td { padding: 12px; font-size: 13px; border-bottom: 1px solid var(--border-color); color: var(--text-color); }
-    </style>
-
-    <div id="liveModal" class="live-modal">
-        <div class="live-modal-content">
-            <span class="close-live" onclick="closeLive()">&times;</span>
-            <h2 id="live-title" style="color: var(--primary-color); font-size: 20px; display: flex; align-items: center; gap: 10px;">
-                <span class="material-icons-outlined" style="animation: pulse 2s infinite;">sensors</span> 
-                Tráfico en Vivo
-            </h2>
-            <div class="live-table-container">
-                <table id="live-table">
-                    <thead>
-                        <tr><th>Hora</th><th>Número</th><th>Operador</th><th>Status</th><th>Mensaje</th></tr>
-                    </thead>
-                    <tbody></tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-
-    <script src="js/live_logic.js"></script>
 </body>
 </html>
 
