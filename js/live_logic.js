@@ -4,11 +4,12 @@ const colMap = {
     hora: 'SubmitDate', 
     numero: 'PhoneNumber', 
     operador: 'Operator',
-    vendor: 'CompanyName',
-    ruta: 'SMPPAccountName',
+    cliente: 'CompanyName',
+    ruta_cliente: 'SMPPAccountName',
+    vendor:'VendorAccountName',   
     status: 'DLRStatus', 
     mensaje: 'SMSMessage',
-    delay: 'delay'
+    delay: 'DLRDelay'
 };
 
 // Función para cerrar el modal
@@ -51,43 +52,45 @@ async function showLiveTraffic(pais) {
             return;
         }
 
-// --- 🛠️ GENERACIÓN DE FILAS ---
-tbody.innerHTML = filtered.map(d => {
-    // Extraemos los datos usando tus llaves manuales
-    const horaRaw = d[colMap.hora] || '--:--:--';
-    const horaSms = horaRaw.toString().split(' ')[1] || horaRaw;
-    const numeroSms = d[colMap.numero] || 'N/A';
-    const operadorSms = d[colMap.operador] || 'N/A';
-    const vendorSms = d[colMap.vendor] || 'N/A'; // Nueva columna
-    const rutaSms = d[colMap.ruta] || 'N/A';     // Nueva columna
-    const statusSms = d[colMap.status] || 'Unknown';
-    const mensajeSms = d[colMap.mensaje] || 'Sin contenido';
-    const delaySms = d[colMap.delay] || '0s';    // Nueva columna
 
-    // Color del status
-    let statusColor = '#94a3b8';
-    if(statusSms === 'Delivered') statusColor = '#10b981';
-    else if(['Undelivered','Failed','Rejected'].includes(statusSms)) statusColor = '#ef4444';
+        tbody.innerHTML = filtered.map(d => {
+            // Extracción de datos según tu colMap
+            const horaRaw = d[colMap.hora] || '--:--:--';
+            const horaSms = horaRaw.toString().split(' ')[1] || horaRaw;
+            const numeroSms = d[colMap.numero] || 'N/A';
+            const operadorSms = d[colMap.operador] || 'N/A';
+            const clienteSms = d[colMap.cliente] || 'N/A';
+            const rutaClienteSms = d[colMap.ruta_cliente] || 'N/A';
+            const vendorSms = d[colMap.vendor] || 'N/A';
+            const statusSms = d[colMap.status] || 'Unknown';
+            const delaySms = d[colMap.delay] !== undefined ? d[colMap.delay] + 's' : '0s';
+            const mensajeSms = d[colMap.mensaje] || d.SMSMessage || d.Text || 'Sin contenido';
 
-    return `
-        <tr>
-            <td>${horaSms}</td>
-            <td style="font-family: monospace;">${numeroSms}</td>
-            <td>${operadorSms}</td>
-            <td style="font-size: 11px;">${vendorSms}</td>
-            <td style="font-size: 11px; color: var(--primary-color);">${rutaSms}</td>
-            <td>
-                <span style="background: ${statusColor}20; color: ${statusColor}; padding: 4px 8px; border-radius: 6px; font-weight: bold; font-size: 11px;">
-                    ${statusSms}
-                </span>
-            </td>
-            <td>${delaySms}</td>
-            <td title="${mensajeSms}" style="max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: help; font-size: 11px;">
-                ${mensajeSms}
-            </td>
-        </tr>
-    `;
-}).join('');
+            // Colores dinámicos para el status
+            let statusColor = '#94a3b8'; // gris por defecto
+            if(statusSms === 'Delivered') statusColor = '#10b981'; // verde
+            else if(['Undelivered','Failed','Rejected'].includes(statusSms)) statusColor = '#ef4444'; // rojo
+
+            return `
+                <tr>
+                    <td>${horaSms}</td>
+                    <td style="font-family: monospace; font-size: 13px;">${numeroSms}</td>
+                    <td>${operadorSms}</td>
+                    <td style="font-size: 11px; font-weight: 600; color: #6366f1;">${clienteSms}</td>
+                    <td style="font-size: 11px;">${rutaClienteSms}</td>
+                    <td style="font-size: 11px; font-weight: 600; color: #f59e0b;">${vendorSms}</td>
+                    <td>
+                        <span style="background: ${statusColor}20; color: ${statusColor}; padding: 4px 8px; border-radius: 6px; font-weight: bold; font-size: 11px;">
+                            ${statusSms}
+                        </span>
+                    </td>
+                    <td style="font-size: 12px;">${delaySms}</td>
+                    <td title="${mensajeSms}" style="font-size: 11px; max-width: 250px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: help;">
+                        ${mensajeSms}
+                    </td>
+                </tr>
+            `;
+        }).join('');
     } catch (e) {
         console.error("Error cargando live traffic:", e);
         tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:#ef4444; padding: 20px;">Error: No se pudo cargar el archivo en vivo datos/live_traffic.xlsx.</td></tr>';
