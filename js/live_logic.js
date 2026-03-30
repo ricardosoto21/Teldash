@@ -1,6 +1,5 @@
-// --- 🛠️ CONFIGURACIÓN MANUAL DE COLUMNAS (Mapeo Seguro) ---
+// --- 🛠️ CONFIGURACIÓN MANUAL DE COLUMNAS ---
 const colMap = {
-    // Pon aquí el NOMBRE EXACTO de la columna que quieres leer del Excel
     hora: 'SubmitDate', 
     numero: 'PhoneNumber', 
     operador: 'Operator',
@@ -9,15 +8,13 @@ const colMap = {
     vendor:'VendorAccountName',   
     status: 'DLRStatus', 
     mensaje: 'SMSMessage',
-    delay: 'DLRDelay'
+    delay: 'DLRDelay' 
 };
 
-// Función para cerrar el modal
 function closeLive() {
     document.getElementById('liveModal').style.display = 'none';
 }
 
-// Cierra el modal si haces clic fuera
 window.onclick = function(event) {
     const modal = document.getElementById('liveModal');
     if (event.target == modal) closeLive();
@@ -30,33 +27,39 @@ async function showLiveTraffic(pais) {
 
     modal.style.display = 'block';
     title.innerHTML = `📡 Tráfico en Vivo: ${pais}`;
-    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding: 20px;">Cargando registros...⏳</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; padding: 20px;">Cargando registros...⏳</td></tr>';
 
     try {
-        // Obtenemos la ruta correcta (datos/live_traffic.xlsx está en la raíz)
-        const rutaDatos = "datos/live_traffic.xlsx"; // Si estás en index.html o Destinos.html, esta es la ruta
-        
-        // Cache busting con timestamp
+        const rutaDatos = "datos/live_traffic.xlsx"; 
         const res = await fetch(`${rutaDatos}?t=${new Date().getTime()}`);
         if (!res.ok) throw new Error("Archivo no encontrado");
         
         const buffer = await res.arrayBuffer();
         const wb = XLSX.read(buffer, { type: 'array' });
-        const liveData = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
+        // Usamos raw: false para intentar que SheetJS mantenga el formato de texto de Excel
+        const liveData = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { raw: false });
 
-        // Filtramos por país
         const filtered = liveData.filter(d => d.CountryRealName === pais);
         
         if (filtered.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding: 20px;">No hay registros recientes para este país.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; padding: 20px;">No hay registros recientes para este país.</td></tr>';
             return;
         }
 
-
         tbody.innerHTML = filtered.map(d => {
-            // Extracción de datos según tu colMap
-            const horaRaw = d[colMap.hora] || '--:--:--';
-            const horaSms = horaRaw.toString().split(' ')[1] || horaRaw;
+            // 🎯 UPGRADE 2: CORRECCIÓN DE FECHA (Maneja tanto formato serial de Excel como texto)
+            let horaRaw = d[colMap.hora];
+            let horaSms = '--:--:--';
+            if (horaRaw) {
+                if (!isNaN(horaRaw) && typeof horaRaw === 'number') {
+                    let date = new Date((horaRaw - 25569) * 86400 * 1000);
+                    date = new Date(date.getTime() + date.getTimezoneOffset() * 60000); // Ajuste de zona horaria
+                    horaSms = date.toTimeString().split(' ')[0];
+                } else {
+                    horaSms = horaRaw.toString().includes(' ') ? horaRaw.toString().split(' ')[1] : horaRaw.toString();
+                }
+            }
+
             const numeroSms = d[colMap.numero] || 'N/A';
             const operadorSms = d[colMap.operador] || 'N/A';
             const clienteSms = d[colMap.cliente] || 'N/A';
@@ -64,13 +67,14 @@ async function showLiveTraffic(pais) {
             const vendorSms = d[colMap.vendor] || 'N/A';
             const statusSms = d[colMap.status] || 'Unknown';
             const delaySms = d[colMap.delay] !== undefined ? d[colMap.delay] + 's' : '0s';
-            const mensajeSms = d[colMap.mensaje] || d.SMSMessage || d.Text || 'Sin contenido';
+            const mensajeSms = d[colMap.mensaje] || d.Text || d.Message || 'Sin contenido';
 
-            // Colores dinámicos para el status
-            let statusColor = '#94a3b8'; // gris por defecto
-            if(statusSms === 'Delivered') statusColor = '#10b981'; // verde
-            else if(['Undelivered','Failed','Rejected'].includes(statusSms)) statusColor = '#ef4444'; // rojo
+            let statusColor = '#94a3b8';
+            if(statusSms === 'Delivered') statusColor = '#10b981';
+            else if(['Undelivered','Failed','Rejected'].includes(statusSms)) statusColor = '#ef4444';
 
+            // 🎯 UPGRADE 3: SCROLL LATERAL PARA EL MENSAJE
+            // Envolvemos el texto en un div con overflow-x: auto
             return `
                 <tr>
                     <td>${horaSms}</td>
@@ -85,14 +89,16 @@ async function showLiveTraffic(pais) {
                         </span>
                     </td>
                     <td style="font-size: 12px;">${delaySms}</td>
-                    <td title="${mensajeSms}" style="font-size: 11px; max-width: 250px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: help;">
-                        ${mensajeSms}
+                    <td>
+                        <div style="max-width: 250px; overflow-x: auto; white-space: nowrap; padding-bottom: 5px; scrollbar-width: thin; font-size: 11px;">
+                            ${mensajeSms}
+                        </div>
                     </td>
                 </tr>
             `;
         }).join('');
     } catch (e) {
         console.error("Error cargando live traffic:", e);
-        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:#ef4444; padding: 20px;">Error: No se pudo cargar el archivo en vivo datos/live_traffic.xlsx.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; color:#ef4444; padding: 20px;">Error: No se pudo cargar el archivo en vivo.</td></tr>';
     }
 }
