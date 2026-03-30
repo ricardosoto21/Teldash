@@ -131,34 +131,54 @@
     let globalData = {}; 
     let allProviders = new Set(); 
     let banderasISO = {}; 
+    let trafficVolumes = {}; // Guardará el tráfico en vivo por país
     let paisActualModal = "";
     let vistaDetallada = false;
 
     $(document).ready(function() {
-        fetch('https://restcountries.com/v3.1/all?fields=name,cca2')
-            .then(res => res.json())
-            .then(paisesMundo => {
-                paisesMundo.forEach(p => {
-                    banderasISO[p.name.common.toLowerCase()] = p.cca2.toLowerCase();
-                    if(p.name.official) banderasISO[p.name.official.toLowerCase()] = p.cca2.toLowerCase();
-                });
-                banderasISO["usa"] = "us"; banderasISO["uk"] = "gb"; 
-                banderasISO["vietnam"] = "vn"; banderasISO["venezuela"] = "ve"; 
-                banderasISO["russia"] = "ru";
-
-                return fetch(API_URL);
-            })
-            .then(res => res.json())
-            .then(data => {
-                document.getElementById('loading').style.display = 'none';
-                procesarDatos(data);
-                renderizarTarjetas();
-                llenarFiltroProveedores();
-            })
-            .catch(err => {
-                console.error("Error en la descarga:", err);
-                document.getElementById('loading').innerHTML = '<div class="alert alert-danger shadow">Error al conectar con la base de datos.</div>';
+        // 🎯 UPGRADE 1: Descargamos Banderas, Tarifas y el archivo LIVE TRAFFIC
+        Promise.all([
+            fetch('https://restcountries.com/v3.1/all?fields=name,cca2').then(r => r.json()),
+            fetch(API_URL).then(r => r.json()),
+            // 👇 AHORA LEEMOS EL ARCHIVO EN VIVO PARA ORDENAR
+            fetch(`datos/live_traffic.xlsx?t=${new Date().getTime()}`).then(r => r.arrayBuffer()).catch(() => null)
+        ])
+        .then(([paisesMundo, dataTarifas, bufferLive]) => {
+            // 1. Mapeo de banderas
+            paisesMundo.forEach(p => {
+                banderasISO[p.name.common.toLowerCase()] = p.cca2.toLowerCase();
+                if(p.name.official) banderasISO[p.name.official.toLowerCase()] = p.cca2.toLowerCase();
             });
+            banderasISO["usa"] = "us"; banderasISO["uk"] = "gb"; 
+            banderasISO["vietnam"] = "vn"; banderasISO["venezuela"] = "ve"; 
+            banderasISO["russia"] = "ru";
+
+            // 2. Extraer volumen de tráfico desde tu LIVE TRAFFIC
+            if (bufferLive) {
+                try {
+                    const wb = XLSX.read(bufferLive, { type: 'array' });
+                    const liveData = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
+                    
+                    liveData.forEach(row => {
+                        const pais = row.CountryRealName;
+                        if (pais) {
+                            // En el archivo en vivo, cada fila es un mensaje (sumamos 1)
+                            trafficVolumes[pais] = (trafficVolumes[pais] || 0) + 1;
+                        }
+                    });
+                } catch(e) { console.warn("No se pudo leer el live traffic para ordenar. Ordenando alfabéticamente."); }
+            }
+
+            // 3. Procesar y dibujar
+            document.getElementById('loading').style.display = 'none';
+            procesarDatos(dataTarifas);
+            renderizarTarjetas();
+            llenarFiltroProveedores();
+        })
+        .catch(err => {
+            console.error("Error de inicialización:", err);
+            document.getElementById('loading').innerHTML = '<div class="alert alert-danger shadow">Error al conectar con la base de datos.</div>';
+        });
 
         $('#searchCountry').on('keyup', filtrarTarjetas);
         $('#filterProvider').on('change', filtrarTarjetas);
@@ -181,7 +201,14 @@
     function renderizarTarjetas() {
         const container = $('#cardsContainer');
         container.empty();
-        const paisesOrdenados = Object.keys(globalData).sort();
+        
+        // 🎯 ORDENAR POR TRÁFICO EN VIVO DE MAYOR A MENOR
+        const paisesOrdenados = Object.keys(globalData).sort((a, b) => {
+            const volA = trafficVolumes[a] || 0;
+            const volB = trafficVolumes[b] || 0;
+            if (volA !== volB) return volB - volA; // Mayor tráfico primero
+            return a.localeCompare(b); // Si hay empate o 0 tráfico, ordenar alfabéticamente
+        });
 
         paisesOrdenados.forEach(nombrePais => {
             const info = globalData[nombrePais];
@@ -195,13 +222,18 @@
                 ? `<img src="https://flagcdn.com/w40/${codigoIso}.png" width="40" alt="${nombrePais}" class="mb-3 rounded shadow-sm">` 
                 : `<div class="mb-2" style="font-size: 2rem;">🌐</div>`;
 
-            // 🎯 AQUÍ SE REPARÓ LA TARJETA (Se incluye event.stopPropagation() en el botón Live)
+            // 🎯 INDICADOR VISUAL DE TRÁFICO EN VIVO (Con etiqueta "Live")
+            const volBadge = trafficVolumes[nombrePais] 
+                ? `<div style="font-size: 11px; color: #ef4444; font-weight: bold; margin-bottom: 5px;">🔥 ${trafficVolumes[nombrePais].toLocaleString()} SMS (Live)</div>` 
+                : '';
+
             const cardHTML = `
                 <div class="col-xl-3 col-lg-4 col-md-6 mb-4 card-item" data-pais="${nombreNormalizado}" data-proveedores="${listaProveedores.toLowerCase()}">
                     <div class="card country-card h-100 d-flex flex-column" onclick="abrirDetalle('${nombrePais}')">
                         <div class="card-body text-center flex-grow-1">
                             ${flagHTML}
                             <h5 class="card-title">${nombrePais}</h5>
+                            ${volBadge}
                             <span class="badge bg-success badge-providers mb-3">
                                 ${numProveedores} Proveedor${numProveedores > 1 ? 'es' : ''}
                             </span>
