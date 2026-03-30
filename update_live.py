@@ -47,7 +47,7 @@ def update_live():
         df = pd.read_excel(io.BytesIO(r.content))
         if not df.empty:
             # Ordenamos por lo más nuevo y limitamos a 3000 filas para que el Dashboard no pese
-            df_live = df.sort_values('SubmitDate', ascending=False).head(3000)
+            df_live = df.sort_values('SubmitDate', ascending=False).head(300000)
             df_live.to_excel(RUTA_LIVE, index=False)
             print(f"✅ Live Traffic actualizado: {len(df_live)} registros guardados en {RUTA_LIVE}")
         else:
