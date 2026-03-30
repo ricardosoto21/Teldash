@@ -6,7 +6,7 @@ import time
 # --- CONFIGURACIÓN ---
 USUARIO = os.environ.get('SMS_USER')
 CLAVE = os.environ.get('SMS_PASS')
-DIAS_ATRAS = 365 
+DIAS_ATRAS = 730 
 RUTA_EXCEL = 'datos/reporte_actual.xlsx'
 
 URL_INICIO = 'http://65.108.69.39:5660/'
