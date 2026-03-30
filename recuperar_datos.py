@@ -7,8 +7,21 @@ USUARIO = os.environ.get('SMS_USER')
 CLAVE = os.environ.get('SMS_PASS')
 RUTA_EXCEL = 'datos/reporte_actual.xlsx'
 
-# 🎯 AQUÍ PONES LOS DÍAS EXACTOS QUE QUIERES RECUPERAR (Formato YYYY-MM-DD)
+# 🎯 DÍAS A RECUPERAR
 DIAS_FALTANTES = ['2026-03-24', '2026-03-25']
+
+# 🚨 LISTA OFICIAL DE DIMENSIONES (Garantiza paridad exacta con update_data.py)
+DIMENSIONES = [
+    'SubmitDate', 'CompanyName', 'SMPPAccountName', 'SMPPUsername', 'MCC', 'MNC', 
+    'OperatorName', 'DLRStatus', 'ErrorDescription', 'VendorAccountName', 'SenderID', 
+    'CountryRealName', 'CurrencyCode', 'TerminationCurrencyCode', 'SMSSource', 
+    'SMSType', 'MessageType', 'ErrorCode'
+]
+
+METRICAS = {
+    'MessageParts': 'sum', 'ClientCost': 'sum', 'TerminationCost': 'sum',
+    'ClientCostUSD': 'sum', 'TerminationCostUSD': 'sum', 'DLRDelay': 'mean'
+}
 
 session = requests.Session()
 cache_tasas = {}
@@ -42,7 +55,12 @@ def login():
 def recuperar():
     login()
     print("⏳ Leyendo base de datos histórica...")
+    if not os.path.exists(RUTA_EXCEL):
+        print("❌ Error: No se encontró el histórico para inyectar los datos.")
+        return
+        
     df_hist = pd.read_excel(RUTA_EXCEL)
+    df_hist['SubmitDate'] = pd.to_datetime(df_hist['SubmitDate']).dt.date
     nuevos_datos = []
     
     for dia in DIAS_FALTANTES:
@@ -65,26 +83,29 @@ def recuperar():
                 return pd.Series([row['ClientCost'] * t_client, row['TerminationCost'] * t_vendor])
 
             df[['ClientCostUSD', 'TerminationCostUSD']] = df.apply(aplicar_conversion, axis=1)
-            
             df['SubmitDate'] = pd.to_datetime(df['SubmitDate']).dt.date
-            dimensiones = ['SubmitDate', 'CompanyName', 'SMPPAccountName', 'SMPPUsername', 'MCC', 'MNC', 'OperatorName', 'DLRStatus', 'ErrorDescription', 'VendorAccountName', 'SenderID', 'CountryRealName', 'CurrencyCode', 'TerminationCurrencyCode', 'SMSSource', 'SMSType', 'MessageType', 'ErrorCode']
-            cols_agrupar = [c for c in dimensiones if c in df.columns]
             
-            resumen = df.groupby(cols_agrupar).agg({
-                'MessageParts': 'sum', 'ClientCost': 'sum', 'TerminationCost': 'sum',
-                'ClientCostUSD': 'sum', 'TerminationCostUSD': 'sum', 'DLRDelay': 'mean'
-            }).reset_index()
+            # 2. 🛡️ FORZAR COLUMNAS PARA PARIDAD EXACTA
+            for col in DIMENSIONES:
+                if col not in df.columns: df[col] = "N/A"
+                
+            for col in METRICAS.keys():
+                if col not in df.columns: df[col] = 0.0
             
+            resumen = df.groupby(DIMENSIONES).agg(METRICAS).reset_index()
             nuevos_datos.append(resumen)
             print(f"✅ {dia} procesado: {len(resumen)} grupos generados.")
     
     if nuevos_datos:
         print("⚙️ Uniendo los datos recuperados al archivo principal...")
+        
+        # 🚨 CIRUGÍA SEGURA
+        dias_a_borrar = [pd.to_datetime(d).date() for d in DIAS_FALTANTES]
+        df_hist = df_hist[~df_hist['SubmitDate'].isin(dias_a_borrar)]
+        
         df_final = pd.concat([df_hist] + nuevos_datos, ignore_index=True)
-        # Limpieza por si acaso alguna fila de ese día ya existía a medias
-        df_final = df_final.drop_duplicates(subset=cols_agrupar, keep='last')
         df_final.to_excel(RUTA_EXCEL, index=False)
-        print("🏆 ¡Rescate Exitoso! Archivo guardado.")
+        print("🏆 ¡Rescate Exitoso! Archivo guardado, con paridad de columnas verificada.")
     else:
         print("⚠️ No se generaron datos nuevos.")
 
