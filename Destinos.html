@@ -3,58 +3,57 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SMS Rates - Smart Dashboard</title>
+    <title>Teldash - Consola de Rentabilidad</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
     
     <style>
         body { font-family: 'Inter', sans-serif; background-color: #f0f2f5; color: #1c1e21; }
         .header-bg { background: linear-gradient(135deg, #1e3c72, #2a5298); color: white; padding: 40px 0 30px; margin-bottom: 30px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
         
-        /* Estilos de las Tarjetas */
         .country-card { transition: transform 0.2s, box-shadow 0.2s; cursor: pointer; border: none; border-radius: 12px; }
         .country-card:hover { transform: translateY(-5px); box-shadow: 0 10px 20px rgba(0,0,0,0.1) !important; border-color: #2a5298; }
         .card-title { font-weight: 800; font-size: 1.2rem; color: #333; }
-        .badge-providers { font-size: 0.85rem; padding: 8px 12px; border-radius: 20px; }
-        
-        /* Buscadores y Filtros */
-        .search-box { border-radius: 20px; padding: 10px 20px; border: 1px solid #ddd; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
-        
-        /* Modal (Detalle Tarifas) */
-        .modal-header { background-color: #f8f9fa; border-bottom: 2px solid #e9ecef; }
-        .table-details th { background-color: #f1f3f5; font-size: 0.85rem; text-transform: uppercase; color: #6c757d; }
-        .table-details td { vertical-align: middle; font-size: 0.95rem; }
-        .precio-desde { font-size: 0.8rem; color: #6c757d; font-weight: normal; margin-right: 4px; }
+        .search-box { border-radius: 20px; padding: 10px 20px; border: 1px solid #ddd; }
+
+        /* --- VISTA RENTABILIDAD --- */
+        .section-sale { background-color: #eef2ff !important; color: #3730a3 !important; border-bottom: 3px solid #4338ca !important; font-weight: 800; text-align: center; }
+        .section-cost { background-color: #f3f4f6 !important; color: #374151 !important; border-bottom: 3px solid #4b5563 !important; font-weight: 800; text-align: center; }
+
+        .badge-margin { display: inline-block; padding: 5px 12px; border-radius: 8px; font-weight: 800; font-size: 0.9rem; }
+        .margin-high { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; } /* > 15% */
+        .margin-mid { background: #fef9c3; color: #854d0e; border: 1px solid #fef08a; }  /* 5-15% */
+        .margin-low { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }  /* < 5% */
+
+        .kpi-row { display: flex; gap: 12px; padding: 15px; background: #f8fafc; border-bottom: 1px solid #e2e8f0; }
+        .kpi-item { flex: 1; background: white; padding: 10px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); text-align: center; border-left: 4px solid #4338ca; }
+        .kpi-title { font-size: 0.65rem; text-transform: uppercase; color: #64748b; font-weight: 700; }
+        .kpi-val { font-size: 1.1rem; font-weight: 800; color: #1e293b; }
 
         /* Modal (Tráfico en Vivo) */
         .live-modal { display: none; position: fixed; z-index: 9999; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); backdrop-filter: blur(5px); }
         .live-modal-content { background: #1e293b; margin: 3% auto; padding: 25px; width: 95%; max-width: 1200px; border-radius: 15px; border: 1px solid #334155; position: relative; color: #f8fafc; }
-        .close-live { position: absolute; top: 15px; right: 20px; color: #ef4444; font-size: 30px; cursor: pointer; transition: 0.2s; }
-        .close-live:hover { color: #dc2626; transform: scale(1.1); }
+        .close-live { position: absolute; top: 15px; right: 20px; color: #ef4444; font-size: 30px; cursor: pointer; }
         .live-table-container { margin-top: 20px; max-height: 500px; overflow-y: auto; border-radius: 8px; border: 1px solid #334155; }
         .live-table-container table { width: 100%; border-collapse: collapse; }
         .live-table-container th { background: #0f172a; padding: 12px; position: sticky; top: 0; color: #94a3b8; font-size: 11px; text-transform: uppercase; z-index: 10; }
         .live-table-container td { padding: 12px; border-bottom: 1px solid #334155; font-size: 13px; color: #f8fafc; }
-
-        /* Botón Live en tarjeta */
-        .btn-live { border-radius: 8px; font-size: 0.85rem; font-weight: 600; padding: 6px 12px; transition: 0.3s; width: 100%; }
-        .btn-live:hover { transform: scale(1.02); }
     </style>
 </head>
 <body>
 
 <div class="header-bg text-center">
     <div class="container">
-        <h1 class="fw-bold">🌍 Cobertura Global SMS</h1>
-        <p class="lead opacity-75">Selecciona un país para ver las rutas y tarifas disponibles</p>
+        <h1 class="fw-bold">🌍 Consola de Rentabilidad</h1>
+        <p class="lead opacity-75">Compara precios de venta vs costos de proveedores en tiempo real</p>
     </div>
 </div>
 
 <div class="container mb-5">
-    
     <div class="row mb-4 justify-content-center">
         <div class="col-md-5 mb-2">
-            <input type="text" id="searchCountry" class="form-control search-box" placeholder="🔍 Buscar País (Ej. Chile, Spain)...">
+            <input type="text" id="searchCountry" class="form-control search-box" placeholder="🔍 Buscar País...">
         </div>
         <div class="col-md-4 mb-2">
             <select id="filterProvider" class="form-select search-box">
@@ -65,11 +64,10 @@
 
     <div id="loading" class="text-center my-5">
         <div class="spinner-border text-primary" style="width: 3rem; height: 3rem;" role="status"></div>
-        <p class="mt-3 text-muted fw-bold">Sincronizando rutas y banderas...</p>
+        <p class="mt-3 text-muted fw-bold">Sincronizando márgenes de ganancia...</p>
     </div>
 
-    <div class="row" id="cardsContainer">
-        </div>
+    <div class="row" id="cardsContainer"></div>
 </div>
 
 <div class="modal fade" id="countryModal" tabindex="-1" aria-hidden="true">
@@ -78,11 +76,12 @@
             <div class="modal-header d-flex justify-content-between align-items-center">
                 <h4 class="modal-title fw-bold mb-0" id="modalCountryName">País</h4>
                 <div>
-                    <button id="toggleOpBtn" class="btn btn-sm btn-outline-primary me-3" onclick="toggleOperadores()">Ver detalle por Operador</button>
+                    <button id="toggleOpBtn" class="btn btn-sm btn-outline-primary me-3" onclick="toggleOperadores()">Vista Detallada</button>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
             </div>
             <div class="modal-body p-0">
+                <div id="kpiContainer"></div>
                 <div class="table-responsive">
                     <table class="table table-hover table-details mb-0">
                         <thead id="modalTableHead"></thead>
@@ -105,15 +104,7 @@
             <table id="live-table">
                 <thead>
                     <tr>
-                        <th>Hora</th>
-                        <th>Número</th>
-                        <th>Operador</th>
-                        <th>Cliente</th>
-                        <th>Ruta Cliente</th>
-                        <th>Vendor</th>
-                        <th>Status</th>
-                        <th>Delay</th>
-                        <th>Mensaje</th>
+                        <th>Hora</th><th>Número</th><th>Operador</th><th>Cliente</th><th>Ruta</th><th>Vendor</th><th>Status</th><th>Delay</th><th>Mensaje</th>
                     </tr>
                 </thead>
                 <tbody></tbody>
@@ -124,273 +115,200 @@
 
 <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
 <script>
-    const API_URL = "https://script.google.com/macros/s/AKfycbxAs45hYUlPGmCyY4FijgoEa6ZfogMh3WOqQHUvc3FOUt_mhNtLaywoAZdibGVq7gob/exec"; 
+    // 🔴 ACTUALIZA TU API_URL AQUÍ
+    const API_URL = "https://script.google.com/macros/s/AKfycbwIu8ZspJGhdBuyHmxvAA-Kqpk9OdKnmut9CzbPnTwF_Ppddz__IKzuqrYxbfdLPMxi/exec"; 
     
-    let globalData = {}; 
+    let globalData = {};      // Costos (DATOS_MAESTROS)
+    let globalSalesData = {}; // Ventas (PRECIOS_VENTA)
     let allProviders = new Set(); 
     let banderasISO = {}; 
-    let trafficVolumes = {}; // Guardará el tráfico en vivo por país
+    let trafficVolumes = {}; 
     let paisActualModal = "";
     let vistaDetallada = false;
 
     $(document).ready(function() {
-        // 🎯 UPGRADE 1: Descargamos Banderas, Tarifas y el archivo LIVE TRAFFIC
         Promise.all([
             fetch('https://restcountries.com/v3.1/all?fields=name,cca2').then(r => r.json()),
             fetch(API_URL).then(r => r.json()),
-            // 👇 AHORA LEEMOS EL ARCHIVO EN VIVO PARA ORDENAR
             fetch(`datos/live_traffic.xlsx?t=${new Date().getTime()}`).then(r => r.arrayBuffer()).catch(() => null)
         ])
-        .then(([paisesMundo, dataTarifas, bufferLive]) => {
-            // 1. Mapeo de banderas
+        .then(([paisesMundo, dualData, bufferLive]) => {
             paisesMundo.forEach(p => {
                 banderasISO[p.name.common.toLowerCase()] = p.cca2.toLowerCase();
-                if(p.name.official) banderasISO[p.name.official.toLowerCase()] = p.cca2.toLowerCase();
             });
-            banderasISO["usa"] = "us"; banderasISO["uk"] = "gb"; 
-            banderasISO["vietnam"] = "vn"; banderasISO["venezuela"] = "ve"; 
-            banderasISO["russia"] = "ru";
+            banderasISO["usa"] = "us"; banderasISO["uk"] = "gb";
 
-            // 2. Extraer volumen de tráfico desde tu LIVE TRAFFIC
             if (bufferLive) {
-                try {
-                    const wb = XLSX.read(bufferLive, { type: 'array' });
-                    const liveData = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
-                    
-                    liveData.forEach(row => {
-                        const pais = row.CountryRealName;
-                        if (pais) {
-                            // En el archivo en vivo, cada fila es un mensaje (sumamos 1)
-                            trafficVolumes[pais] = (trafficVolumes[pais] || 0) + 1;
-                        }
-                    });
-                } catch(e) { console.warn("No se pudo leer el live traffic para ordenar. Ordenando alfabéticamente."); }
+                const wb = XLSX.read(bufferLive, { type: 'array' });
+                const liveData = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
+                liveData.forEach(row => {
+                    if (row.CountryRealName) trafficVolumes[row.CountryRealName] = (trafficVolumes[row.CountryRealName] || 0) + 1;
+                });
             }
 
-            // 3. Procesar y dibujar
             document.getElementById('loading').style.display = 'none';
-            procesarDatos(dataTarifas);
+            procesarDatosDual(dualData);
             renderizarTarjetas();
             llenarFiltroProveedores();
         })
         .catch(err => {
-            console.error("Error de inicialización:", err);
-            document.getElementById('loading').innerHTML = '<div class="alert alert-danger shadow">Error al conectar con la base de datos.</div>';
+            console.error("Error:", err);
+            document.getElementById('loading').innerHTML = '<div class="alert alert-danger">Error conectando con la API de Rentabilidad.</div>';
         });
 
         $('#searchCountry').on('keyup', filtrarTarjetas);
         $('#filterProvider').on('change', filtrarTarjetas);
     });
 
-    function procesarDatos(data) {
-        data.forEach(row => {
-            const pais = row.pais || "Desconocido";
-            const proveedor = row.proveedor || "Sin Nombre";
-            allProviders.add(proveedor);
-
-            if (!globalData[pais]) {
-                globalData[pais] = { nombre: pais, proveedores: new Set(), rutas: [] };
-            }
-            globalData[pais].proveedores.add(proveedor);
+    function procesarDatosDual(data) {
+        // Costos
+        data.costos.forEach(row => {
+            const pais = row.País || "Desconocido";
+            if (!globalData[pais]) globalData[pais] = { nombre: pais, proveedores: new Set(), rutas: [] };
+            globalData[pais].proveedores.add(row.Proveedor);
             globalData[pais].rutas.push(row);
+            allProviders.add(row.Proveedor);
+        });
+        // Ventas
+        data.ventas.forEach(row => {
+            const pais = row.CountryRealName || "Desconocido";
+            if (!globalSalesData[pais]) globalSalesData[pais] = { rutas: [] };
+            globalSalesData[pais].rutas.push(row);
         });
     }
 
     function renderizarTarjetas() {
         const container = $('#cardsContainer');
         container.empty();
-        
-        // 🎯 ORDENAR POR TRÁFICO EN VIVO DE MAYOR A MENOR
-        const paisesOrdenados = Object.keys(globalData).sort((a, b) => {
-            const volA = trafficVolumes[a] || 0;
-            const volB = trafficVolumes[b] || 0;
-            if (volA !== volB) return volB - volA; // Mayor tráfico primero
-            return a.localeCompare(b); // Si hay empate o 0 tráfico, ordenar alfabéticamente
-        });
+        const paisesOrdenados = Object.keys(globalData).sort((a, b) => (trafficVolumes[b] || 0) - (trafficVolumes[a] || 0));
 
         paisesOrdenados.forEach(nombrePais => {
             const info = globalData[nombrePais];
-            const numProveedores = info.proveedores.size;
-            const listaProveedores = Array.from(info.proveedores).join(','); 
+            const codigoIso = banderasISO[nombrePais.toLowerCase().trim()];
+            const flagHTML = codigoIso ? `<img src="https://flagcdn.com/w40/${codigoIso}.png" width="40" class="mb-3 rounded shadow-sm">` : '🌐';
+            const liveBadge = trafficVolumes[nombrePais] ? `<div style="font-size: 11px; color: #ef4444; font-weight: bold; margin-bottom: 5px;">🔥 ${trafficVolumes[nombrePais]} SMS (Live)</div>` : '';
 
-            const nombreNormalizado = nombrePais.toLowerCase().trim();
-            const codigoIso = banderasISO[nombreNormalizado];
-            
-            const flagHTML = codigoIso 
-                ? `<img src="https://flagcdn.com/w40/${codigoIso}.png" width="40" alt="${nombrePais}" class="mb-3 rounded shadow-sm">` 
-                : `<div class="mb-2" style="font-size: 2rem;">🌐</div>`;
-
-            // 🎯 INDICADOR VISUAL DE TRÁFICO EN VIVO (Con etiqueta "Live")
-            const volBadge = trafficVolumes[nombrePais] 
-                ? `<div style="font-size: 11px; color: #ef4444; font-weight: bold; margin-bottom: 5px;">🔥 ${trafficVolumes[nombrePais].toLocaleString()} SMS (Live)</div>` 
-                : '';
-
-            const cardHTML = `
-                <div class="col-xl-3 col-lg-4 col-md-6 mb-4 card-item" data-pais="${nombreNormalizado}" data-proveedores="${listaProveedores.toLowerCase()}">
+            container.append(`
+                <div class="col-xl-3 col-lg-4 col-md-6 mb-4 card-item" data-pais="${nombrePais.toLowerCase()}" data-proveedores="${Array.from(info.proveedores).join(',').toLowerCase()}">
                     <div class="card country-card h-100 d-flex flex-column" onclick="abrirDetalle('${nombrePais}')">
                         <div class="card-body text-center flex-grow-1">
                             ${flagHTML}
                             <h5 class="card-title">${nombrePais}</h5>
-                            ${volBadge}
-                            <span class="badge bg-success badge-providers mb-3">
-                                ${numProveedores} Proveedor${numProveedores > 1 ? 'es' : ''}
-                            </span>
+                            ${liveBadge}
+                            <span class="badge bg-success" style="border-radius:20px;">${info.proveedores.size} Proveedores</span>
                         </div>
-                        <div class="card-footer bg-white border-0 pb-3 text-center">
-                            <button onclick="event.stopPropagation(); showLiveTraffic('${nombrePais}')" class="btn btn-outline-danger btn-live d-flex align-items-center justify-content-center gap-2">
-                                📡 Ver Tráfico Live
-                            </button>
+                        <div class="card-footer bg-white border-0 pb-3">
+                            <button onclick="event.stopPropagation(); showLiveTraffic('${nombrePais}')" class="btn btn-outline-danger w-100 btn-sm">📡 Ver Live</button>
                         </div>
                     </div>
                 </div>
-            `;
-            container.append(cardHTML);
-        });
-    }
-
-    function llenarFiltroProveedores() {
-        const select = $('#filterProvider');
-        Array.from(allProviders).sort().forEach(prov => {
-            select.append(`<option value="${prov.toLowerCase()}">${prov}</option>`);
-        });
-    }
-
-    function filtrarTarjetas() {
-        const textoBuscar = $('#searchCountry').val().toLowerCase();
-        const provFiltro = $('#filterProvider').val();
-
-        $('.card-item').each(function() {
-            const paisCard = $(this).data('pais');
-            const provsCard = $(this).data('proveedores');
-
-            const coincideTexto = paisCard.includes(textoBuscar);
-            const coincideProv = (provFiltro === "ALL") || provsCard.includes(provFiltro);
-
-            if (coincideTexto && coincideProv) $(this).show();
-            else $(this).hide();
+            `);
         });
     }
 
     function abrirDetalle(nombrePais) {
         paisActualModal = nombrePais;
         vistaDetallada = false;
-        $('#toggleOpBtn').text('Ver detalle por Operador').removeClass('btn-primary').addClass('btn-outline-primary');
         renderizarTablaModal();
-        const modalEl = document.getElementById('countryModal');
-        const myModal = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
+        const myModal = new bootstrap.Modal(document.getElementById('countryModal'));
         myModal.show();
     }
 
     function toggleOperadores() {
         vistaDetallada = !vistaDetallada;
-        if(vistaDetallada) {
-            $('#toggleOpBtn').text('Ocultar Operadores').removeClass('btn-outline-primary').addClass('btn-primary');
-        } else {
-            $('#toggleOpBtn').text('Ver detalle por Operador').removeClass('btn-primary').addClass('btn-outline-primary');
-        }
+        $('#toggleOpBtn').text(vistaDetallada ? 'Vista Resumida' : 'Vista Detallada');
         renderizarTablaModal();
     }
 
     function renderizarTablaModal() {
-        const info = globalData[paisActualModal];
-        const codigoIso = banderasISO[paisActualModal.toLowerCase().trim()];
-        const flagImg = codigoIso ? `<img src="https://flagcdn.com/w40/${codigoIso}.png" width="30" class="me-2 rounded">` : '';
-        
-        $('#modalCountryName').html(`${flagImg} Rutas para: ${paisActualModal}`);
-        
-        const thead = $('#modalTableHead');
+        const infoCostos = globalData[paisActualModal] || { rutas: [] };
+        const infoVentas = globalSalesData[paisActualModal] || { rutas: [] };
         const tbody = $('#modalTableBody');
-        thead.empty();
-        tbody.empty();
+        const thead = $('#modalTableHead');
+        thead.empty(); tbody.empty();
 
-        if (vistaDetallada) {
-            thead.html(`
+        // 1. KPIs
+        let sumVenta = 0, minCosto = Infinity, maxMargen = -Infinity;
+        infoVentas.rutas.forEach(v => {
+            const rateV = parseFloat(v.Rate);
+            sumVenta += rateV;
+            const matchC = infoCostos.rutas.filter(c => c.Ruta === v.Ruta);
+            if(matchC.length > 0) {
+                const bestC = Math.min(...matchC.map(c => parseFloat(c.Tarifa)));
+                if(bestC < minCosto) minCosto = bestC;
+                const margin = ((rateV - bestC) / rateV) * 100;
+                if(margin > maxMargen) maxMargen = margin;
+            }
+        });
+
+        $('#kpiContainer').html(`
+            <div class="kpi-row">
+                <div class="kpi-item"><div class="kpi-title">Venta Promedio</div><div class="kpi-val">$${(sumVenta/(infoVentas.rutas.length||1)).toFixed(4)}</div></div>
+                <div class="kpi-item"><div class="kpi-title">Costo Mínimo</div><div class="kpi-val">$${minCosto === Infinity ? '0.0000' : minCosto.toFixed(4)}</div></div>
+                <div class="kpi-item" style="border-left-color: #166534;"><div class="kpi-title">Margen Máximo</div><div class="kpi-val text-success">${maxMargen === -Infinity ? '0' : maxMargen.toFixed(1)}%</div></div>
+            </div>
+        `);
+
+        // 2. Cabeceras
+        thead.html(`
+            <tr>
+                <th colspan="2" class="section-sale">NUESTRA VENTA</th>
+                <th colspan="2" class="section-cost">MEJOR COSTO PROVEEDOR</th>
+                <th rowspan="2" class="align-middle bg-light text-center">MARGEN</th>
+            </tr>
+            <tr>
+                <th class="section-sale">Ruta / Tipo</th><th class="section-sale">Precio ($)</th>
+                <th class="section-cost">Proveedor</th><th class="section-cost">Costo ($)</th>
+            </tr>
+        `);
+
+        // 3. Filas
+        infoVentas.rutas.forEach(v => {
+            const rateV = parseFloat(v.Rate);
+            let bestC;
+            if(vistaDetallada) {
+                bestC = infoCostos.rutas.filter(c => c.MCC == v.MCC && c.MNC == v.MNC && c.Ruta == v.Ruta).sort((a,b) => a.Tarifa - b.Tarifa)[0];
+            } else {
+                bestC = infoCostos.rutas.filter(c => c.Ruta == v.Ruta).sort((a,b) => a.Tarifa - b.Tarifa)[0];
+            }
+
+            const rateC = bestC ? parseFloat(bestC.Tarifa) : 0;
+            const margin = rateV > 0 ? ((rateV - rateC) / rateV) * 100 : 0;
+            const badgeClass = margin > 15 ? "margin-high" : (margin >= 5 ? "margin-mid" : "margin-low");
+
+            tbody.append(`
                 <tr>
-                    <th>Proveedor</th>
-                    <th>Ruta</th>
-                    <th>Operador</th>
-                    <th>MCC-MNC</th>
-                    <th>Tarifa</th>
-                    <th>Moneda</th>
+                    <td><span class="fw-bold text-primary">${v.Ruta}</span><div style="font-size: 0.7rem;" class="text-muted">${v.OperatorName || v.SMSType || ''}</div></td>
+                    <td class="fw-bold text-primary">$${rateV.toFixed(4)}</td>
+                    <td>${bestC ? bestC.Proveedor : '<span class="text-danger">Sin Ruta</span>'}</td>
+                    <td class="text-secondary">$${rateC.toFixed(4)}</td>
+                    <td class="text-center">
+                        <span class="badge-margin ${badgeClass}">${margin.toFixed(1)}%</span>
+                        <div style="font-size: 0.6rem; color: #64748b; margin-top:3px;">Utilidad: $${(rateV - rateC).toFixed(4)}</div>
+                    </td>
                 </tr>
             `);
+        });
+    }
 
-            const rutasOrdenadas = info.rutas.sort((a, b) => {
-                if (a.proveedor === b.proveedor) return parseFloat(a.tarifa) - parseFloat(b.tarifa);
-                return a.proveedor.localeCompare(b.proveedor);
-            });
+    function llenarFiltroProveedores() {
+        const select = $('#filterProvider');
+        Array.from(allProviders).sort().forEach(p => select.append(`<option value="${p.toLowerCase()}">${p}</option>`));
+    }
 
-            rutasOrdenadas.forEach(ruta => {
-                const badgeColor = ruta.moneda.toUpperCase().includes('USD') ? 'bg-success' : 'bg-info text-dark';
-                tbody.append(`
-                    <tr>
-                        <td class="fw-bold text-primary">${ruta.proveedor}</td>
-                        <td><span class="badge bg-secondary">${ruta.ruta || 'N/A'}</span></td>
-                        <td>${ruta.operador || 'Todos'}</td>
-                        <td><small class="text-muted">${ruta.mcc || '000'} - ${ruta.mnc || '00'}</small></td>
-                        <td class="fw-bold fs-5">${parseFloat(ruta.tarifa).toFixed(4)}</td>
-                        <td><span class="badge ${badgeColor}">${ruta.moneda}</span></td>
-                    </tr>
-                `);
-            });
-
-        } else {
-            thead.html(`
-                <tr>
-                    <th>Proveedor</th>
-                    <th>Ruta</th>
-                    <th>Tarifa</th>
-                    <th>Moneda</th>
-                </tr>
-            `);
-
-            let resumen = {};
-            info.rutas.forEach(ruta => {
-                const key = `${ruta.proveedor}_${ruta.ruta}_${ruta.moneda}`;
-                const tarifa = parseFloat(ruta.tarifa);
-                
-                if (!resumen[key]) {
-                    resumen[key] = {
-                        proveedor: ruta.proveedor, ruta: ruta.ruta, moneda: ruta.moneda,
-                        minTarifa: tarifa, maxTarifa: tarifa
-                    };
-                } else {
-                    if (tarifa < resumen[key].minTarifa) resumen[key].minTarifa = tarifa;
-                    if (tarifa > resumen[key].maxTarifa) resumen[key].maxTarifa = tarifa;
-                }
-            });
-
-            const resumenArray = Object.values(resumen).sort((a, b) => {
-                if (a.proveedor === b.proveedor) return a.minTarifa - b.minTarifa;
-                return a.proveedor.localeCompare(b.proveedor);
-            });
-
-            resumenArray.forEach(res => {
-                const badgeColor = res.moneda.toUpperCase().includes('USD') ? 'bg-success' : 'bg-info text-dark';
-                let precioDisplay = res.minTarifa === res.maxTarifa 
-                    ? parseFloat(res.minTarifa).toFixed(4)
-                    : `<span class="precio-desde">Desde</span>${parseFloat(res.minTarifa).toFixed(4)}`;
-
-                tbody.append(`
-                    <tr>
-                        <td class="fw-bold text-primary">${res.proveedor}</td>
-                        <td><span class="badge bg-secondary">${res.ruta || 'N/A'}</span></td>
-                        <td class="fw-bold fs-5">${precioDisplay}</td>
-                        <td><span class="badge ${badgeColor}">${res.moneda}</span></td>
-                    </tr>
-                `);
-            });
-        }
+    function filtrarTarjetas() {
+        const txt = $('#searchCountry').val().toLowerCase();
+        const prov = $('#filterProvider').val();
+        $('.card-item').each(function() {
+            const matchTxt = $(this).data('pais').includes(txt);
+            const matchProv = (prov === "ALL") || $(this).data('proveedores').includes(prov);
+            $(this).toggle(matchTxt && matchProv);
+        });
     }
 </script>
-
-<script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-
-<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-
 <script src="js/live_logic.js"></script>
 </body>
 </html>
