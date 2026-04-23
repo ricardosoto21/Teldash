@@ -3,21 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Teldash - Consola de Rentabilidad</title>
+    <title>Teldash - Consola de Comando</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
     
     <style>
         body { font-family: 'Inter', sans-serif; background-color: #f0f2f5; color: #1c1e21; }
         .header-bg { background: linear-gradient(135deg, #1e3c72, #2a5298); color: white; padding: 40px 0 30px; margin-bottom: 30px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
         
+        /* Estilos de Tarjetas */
         .country-card { transition: transform 0.2s, box-shadow 0.2s; cursor: pointer; border: none; border-radius: 12px; }
         .country-card:hover { transform: translateY(-5px); box-shadow: 0 10px 20px rgba(0,0,0,0.1) !important; border-color: #2a5298; }
         .card-title { font-weight: 800; font-size: 1.2rem; color: #333; }
         .search-box { border-radius: 20px; padding: 10px 20px; border: 1px solid #ddd; }
 
-        /* --- VISTA RENTABILIDAD --- */
+        /* Vista de Rentabilidad */
         .section-sale { background-color: #eef2ff !important; color: #3730a3 !important; border-bottom: 3px solid #4338ca !important; font-weight: 800; text-align: center; }
         .section-cost { background-color: #f3f4f6 !important; color: #374151 !important; border-bottom: 3px solid #4b5563 !important; font-weight: 800; text-align: center; }
 
@@ -31,7 +31,7 @@
         .kpi-title { font-size: 0.65rem; text-transform: uppercase; color: #64748b; font-weight: 700; }
         .kpi-val { font-size: 1.1rem; font-weight: 800; color: #1e293b; }
 
-        /* Modal (Tráfico en Vivo) */
+        /* Modal Live Traffic */
         .live-modal { display: none; position: fixed; z-index: 9999; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); backdrop-filter: blur(5px); }
         .live-modal-content { background: #1e293b; margin: 3% auto; padding: 25px; width: 95%; max-width: 1200px; border-radius: 15px; border: 1px solid #334155; position: relative; color: #f8fafc; }
         .close-live { position: absolute; top: 15px; right: 20px; color: #ef4444; font-size: 30px; cursor: pointer; }
@@ -45,8 +45,8 @@
 
 <div class="header-bg text-center">
     <div class="container">
-        <h1 class="fw-bold">🌍 Consola de Rentabilidad</h1>
-        <p class="lead opacity-75">Compara precios de venta vs costos de proveedores en tiempo real</p>
+        <h1 class="fw-bold">🌍 Teldash: Consola de Comando</h1>
+        <p class="lead opacity-75">Monitoreo de Rentabilidad y Tráfico Live</p>
     </div>
 </div>
 
@@ -64,7 +64,7 @@
 
     <div id="loading" class="text-center my-5">
         <div class="spinner-border text-primary" style="width: 3rem; height: 3rem;" role="status"></div>
-        <p class="mt-3 text-muted fw-bold">Sincronizando márgenes de ganancia...</p>
+        <p class="mt-3 text-muted fw-bold">Sincronizando mercados financieros...</p>
     </div>
 
     <div class="row" id="cardsContainer"></div>
@@ -76,7 +76,7 @@
             <div class="modal-header d-flex justify-content-between align-items-center">
                 <h4 class="modal-title fw-bold mb-0" id="modalCountryName">País</h4>
                 <div>
-                    <button id="toggleOpBtn" class="btn btn-sm btn-outline-primary me-3" onclick="toggleOperadores()">Vista Detallada</button>
+                    <button id="toggleOpBtn" class="btn btn-sm btn-outline-primary me-3" onclick="toggleOperadores()">Ver Detalle Operadores</button>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
             </div>
@@ -118,8 +118,7 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
 <script>
-    // 🔴 ACTUALIZA TU API_URL AQUÍ
-    const API_URL = "https://script.google.com/macros/s/AKfycbwIu8ZspJGhdBuyHmxvAA-Kqpk9OdKnmut9CzbPnTwF_Ppddz__IKzuqrYxbfdLPMxi/exec"; 
+    const API_URL = "https://script.google.com/macros/s/AKfycbyxvGAbaU4P_xNVQn7USe2sFs6kWvTzX_315fj_POtRO7nYIw7Q8Nzc7-pBt6XdFoUO/exec"; 
     
     let globalData = {};      // Costos (DATOS_MAESTROS)
     let globalSalesData = {}; // Ventas (PRECIOS_VENTA)
@@ -128,14 +127,19 @@
     let trafficVolumes = {}; 
     let paisActualModal = "";
     let vistaDetallada = false;
+    let tasaEUR_USD = 1.08; // Valor base por seguridad
 
     $(document).ready(function() {
         Promise.all([
             fetch('https://restcountries.com/v3.1/all?fields=name,cca2').then(r => r.json()),
             fetch(API_URL).then(r => r.json()),
-            fetch(`datos/live_traffic.xlsx?t=${new Date().getTime()}`).then(r => r.arrayBuffer()).catch(() => null)
+            fetch(`datos/live_traffic.xlsx?t=${new Date().getTime()}`).then(r => r.arrayBuffer()).catch(() => null),
+            fetch('https://api.frankfurter.app/latest?from=EUR&to=USD').then(r => r.json()).catch(() => ({rates:{USD:1.08}}))
         ])
-        .then(([paisesMundo, dualData, bufferLive]) => {
+        .then(([paisesMundo, dualData, bufferLive, fxData]) => {
+            // Cargar tasa de cambio
+            if(fxData?.rates?.USD) tasaEUR_USD = fxData.rates.USD;
+
             paisesMundo.forEach(p => {
                 banderasISO[p.name.common.toLowerCase()] = p.cca2.toLowerCase();
             });
@@ -155,8 +159,8 @@
             llenarFiltroProveedores();
         })
         .catch(err => {
-            console.error("Error:", err);
-            document.getElementById('loading').innerHTML = '<div class="alert alert-danger">Error conectando con la API de Rentabilidad.</div>';
+            console.error("Error Inicialización:", err);
+            document.getElementById('loading').innerHTML = '<div class="alert alert-danger shadow">Error de conexión con la base de datos.</div>';
         });
 
         $('#searchCountry').on('keyup', filtrarTarjetas);
@@ -164,7 +168,7 @@
     });
 
     function procesarDatosDual(data) {
-        // Costos
+        // Mapear Costos
         data.costos.forEach(row => {
             const pais = row.País || "Desconocido";
             if (!globalData[pais]) globalData[pais] = { nombre: pais, proveedores: new Set(), rutas: [] };
@@ -172,12 +176,30 @@
             globalData[pais].rutas.push(row);
             allProviders.add(row.Proveedor);
         });
-        // Ventas
+        // Mapear Ventas
         data.ventas.forEach(row => {
             const pais = row.CountryRealName || "Desconocido";
             if (!globalSalesData[pais]) globalSalesData[pais] = { rutas: [] };
             globalSalesData[pais].rutas.push(row);
         });
+    }
+
+    function obtenerCostoUSD(rowCosto) {
+        if (!rowCosto) return 0;
+        let tarifa = parseFloat(rowCosto.Tarifa) || 0;
+        let moneda = (rowCosto.Moneda || 'USD').toString().trim().toUpperCase();
+        return (moneda === 'EUR' || moneda === 'EURO') ? (tarifa * tasaEUR_USD) : tarifa;
+    }
+
+    function encontrarMejorCosto(mcc, mnc) {
+        const infoCostos = globalData[paisActualModal] || { rutas: [] };
+        let candidatos = infoCostos.rutas;
+        if (mcc && mnc && mcc != '0' && mcc != '000') {
+            let exactos = candidatos.filter(c => c.MCC == mcc && c.MNC == mnc);
+            if (exactos.length > 0) candidatos = exactos;
+        }
+        if (candidatos.length === 0) return null;
+        return candidatos.sort((a, b) => obtenerCostoUSD(a) - obtenerCostoUSD(b))[0];
     }
 
     function renderizarTarjetas() {
@@ -200,8 +222,8 @@
                             ${liveBadge}
                             <span class="badge bg-success" style="border-radius:20px;">${info.proveedores.size} Proveedores</span>
                         </div>
-                        <div class="card-footer bg-white border-0 pb-3">
-                            <button onclick="event.stopPropagation(); showLiveTraffic('${nombrePais}')" class="btn btn-outline-danger w-100 btn-sm">📡 Ver Live</button>
+                        <div class="card-footer bg-white border-0 pb-3 text-center">
+                            <button onclick="event.stopPropagation(); showLiveTraffic('${nombrePais}')" class="btn btn-outline-danger btn-sm w-100">📡 Ver Live</button>
                         </div>
                     </div>
                 </div>
@@ -212,6 +234,7 @@
     function abrirDetalle(nombrePais) {
         paisActualModal = nombrePais;
         vistaDetallada = false;
+        $('#toggleOpBtn').text('Ver Detalle Operadores');
         renderizarTablaModal();
         const myModal = new bootstrap.Modal(document.getElementById('countryModal'));
         myModal.show();
@@ -219,97 +242,99 @@
 
     function toggleOperadores() {
         vistaDetallada = !vistaDetallada;
-        $('#toggleOpBtn').text(vistaDetallada ? 'Vista Resumida' : 'Vista Detallada');
+        $('#toggleOpBtn').text(vistaDetallada ? 'Vista Resumida' : 'Ver Detalle Operadores');
         renderizarTablaModal();
     }
 
     function renderizarTablaModal() {
-    const infoCostos = globalData[paisActualModal] || { rutas: [] };
-    const infoVentas = globalSalesData[paisActualModal] || { rutas: [] };
-    const tbody = $('#modalTableBody');
-    const thead = $('#modalTableHead');
-    thead.empty(); tbody.empty();
+        const infoCostos = globalData[paisActualModal] || { rutas: [] };
+        const infoVentas = globalSalesData[paisActualModal] || { rutas: [] };
+        const tbody = $('#modalTableBody');
+        const thead = $('#modalTableHead');
+        thead.empty(); tbody.empty();
 
-    // --- KPIs SUPERIORES ---
-    let sumVenta = 0, minCosto = Infinity, maxMargen = -Infinity;
-    infoVentas.rutas.forEach(v => {
-        const rateV = parseFloat(v.Rate) || 0;
-        sumVenta += rateV;
-        // Buscamos el costo más bajo para esta ruta ignorando mayúsculas/minúsculas
-        const matchC = infoCostos.rutas.filter(c => c.Ruta.trim().toLowerCase() === v.Ruta.trim().toLowerCase());
-        if(matchC.length > 0) {
-            const bestC = Math.min(...matchC.map(c => parseFloat(c.Tarifa) || 0));
-            if(bestC < minCosto) minCosto = bestC;
-            const margin = rateV > 0 ? ((rateV - bestC) / rateV) * 100 : 0;
+        // 1. KPIs
+        let sumVenta = 0, minCosto = Infinity, maxMargen = -Infinity;
+        infoVentas.rutas.forEach(v => {
+            const rateV = parseFloat(v.Rate) || 0;
+            sumVenta += rateV;
+            const bestC = encontrarMejorCosto(v.MCC, v.MNC);
+            const costUSD = obtenerCostoUSD(bestC);
+            if(costUSD > 0 && costUSD < minCosto) minCosto = costUSD;
+            const margin = rateV > 0 ? ((rateV - costUSD) / rateV) * 100 : 0;
             if(margin > maxMargen) maxMargen = margin;
-        }
-    });
+        });
 
-    $('#kpiContainer').html(`
-        <div class="kpi-row">
-            <div class="kpi-item"><div class="kpi-title">Venta Promedio</div><div class="kpi-val">$${(sumVenta/(infoVentas.rutas.length||1)).toFixed(4)}</div></div>
-            <div class="kpi-item"><div class="kpi-title">Costo Mínimo</div><div class="kpi-val">$${minCosto === Infinity ? '0.0000' : minCosto.toFixed(4)}</div></div>
-            <div class="kpi-item" style="border-left-color: #166534;"><div class="kpi-title">Margen Máximo</div><div class="kpi-val text-success">${maxMargen === -Infinity ? '0' : maxMargen.toFixed(1)}%</div></div>
-        </div>
-    `);
+        $('#kpiContainer').html(`
+            <div class="kpi-row">
+                <div class="kpi-item"><div class="kpi-title">Venta Promedio</div><div class="kpi-val">$${(sumVenta/(infoVentas.rutas.length||1)).toFixed(4)}</div></div>
+                <div class="kpi-item"><div class="kpi-title">Costo Mínimo (USD)</div><div class="kpi-val">$${minCosto === Infinity ? '0.0000' : minCosto.toFixed(4)}</div></div>
+                <div class="kpi-item" style="border-left-color: #166534;"><div class="kpi-title">Margen Máximo</div><div class="kpi-val text-success">${maxMargen === -Infinity ? '0' : maxMargen.toFixed(1)}%</div></div>
+            </div>
+        `);
 
-    // --- CABECERAS ---
-    thead.html(`
-        <tr>
-            <th colspan="2" class="section-sale">NUESTRA VENTA (CLIENTE)</th>
-            <th colspan="2" class="section-cost">COSTO PROVEEDOR</th>
-            <th rowspan="2" class="align-middle bg-light text-center">MARGEN</th>
-        </tr>
-        <tr>
-            <th class="section-sale">Ruta / Calidad</th><th class="section-sale">Precio ($)</th>
-            <th class="section-cost">Proveedor</th><th class="section-cost">Costo ($)</th>
-        </tr>
-    `);
-
-    // --- FILAS DE DATOS ---
-    infoVentas.rutas.forEach(v => {
-        const rateV = parseFloat(v.Rate) || 0;
-        let bestC;
-
-        if(vistaDetallada) {
-            // BUSQUEDA DETALLADA: Por Ruta + MCC + MNC (Muestra Operadores)
-            bestC = infoCostos.rutas.filter(c => 
-                c.Ruta.trim().toLowerCase() === v.Ruta.trim().toLowerCase() && 
-                c.MCC == v.MCC && c.MNC == v.MNC
-            ).sort((a,b) => parseFloat(a.Tarifa) - parseFloat(b.Tarifa))[0];
-        } else {
-            // BUSQUEDA RESUMIDA: Por nombre de Ruta solamente
-            bestC = infoCostos.rutas.filter(c => 
-                c.Ruta.trim().toLowerCase() === v.Ruta.trim().toLowerCase()
-            ).sort((a,b) => parseFloat(a.Tarifa) - parseFloat(b.Tarifa))[0];
-        }
-
-        const rateC = bestC ? parseFloat(bestC.Tarifa) : 0;
-        const margin = rateV > 0 ? ((rateV - rateC) / rateV) * 100 : 0;
-        const badgeClass = margin > 15 ? "margin-high" : (margin >= 5 ? "margin-mid" : "margin-low");
-
-        // Condicional para mostrar Operador solo en vista detallada
-        const labelDetalle = vistaDetallada 
-            ? `<div style="font-size: 0.7rem;" class="text-muted">${v.OperatorName || 'Operador Genérico'}</div>` 
-            : '';
-
-        tbody.append(`
+        // 2. TABLA RENTABILIDAD
+        thead.append(`
+            <tr class="table-dark"><th colspan="6" class="text-center py-2">📊 COMPARATIVA DE RENTABILIDAD</th></tr>
             <tr>
-                <td>
-                    <span class="fw-bold text-primary">${v.Ruta}</span>
-                    ${labelDetalle}
-                </td>
-                <td class="fw-bold text-primary">$${rateV.toFixed(4)}</td>
-                <td>${bestC ? bestC.Proveedor : '<span class="text-danger">Sin Cobertura</span>'}</td>
-                <td class="text-secondary">$${rateC > 0 ? rateC.toFixed(4) : '--'}</td>
-                <td class="text-center">
-                    <span class="badge-margin ${badgeClass}">${margin.toFixed(1)}%</span>
-                    <div style="font-size: 0.6rem; color: #64748b; margin-top:3px;">Utilidad: $${(rateV - rateC).toFixed(4)}</div>
-                </td>
+                <th class="section-sale">Cliente / Ruta</th><th class="section-sale">Precio ($)</th>
+                <th class="section-cost">Proveedor</th><th class="section-cost">Ruta Prov.</th><th class="section-cost">Costo (USD)</th>
+                <th class="bg-light text-center">MARGEN</th>
             </tr>
         `);
-    });
-}
+
+        // Agrupación para evitar duplicados en ventas
+        let resumenVentas = {};
+        infoVentas.rutas.forEach(v => {
+            const key = vistaDetallada ? `${v.Cliente}_${v.Ruta}_${v.MCC}_${v.MNC}` : `${v.Cliente}_${v.Ruta}`;
+            if (!resumenVentas[key]) resumenVentas[key] = { ...v, rateV: parseFloat(v.Rate) };
+        });
+
+        Object.values(resumenVentas).forEach(v => {
+            const bestC = encontrarMejorCosto(v.MCC, v.MNC);
+            const costUSD = obtenerCostoUSD(bestC);
+            const margin = v.rateV > 0 && costUSD > 0 ? ((v.rateV - costUSD) / v.rateV) * 100 : 0;
+            const badgeClass = margin > 15 ? "margin-high" : (margin >= 5 ? "margin-mid" : "margin-low");
+
+            tbody.append(`
+                <tr style="border-bottom: 2px solid #e2e8f0;">
+                    <td><span class="fw-bold text-primary">${v.Cliente || 'Genérico'} - ${v.Ruta}</span>
+                        ${vistaDetallada ? `<div style="font-size: 0.7rem;" class="text-muted">${v.OperatorName || ''} (${v.MCC}/${v.MNC})</div>` : ''}
+                    </td>
+                    <td class="fw-bold text-primary align-middle">$${v.rateV.toFixed(4)}</td>
+                    <td class="align-middle">${bestC ? bestC.Proveedor : '<span class="text-danger">Sin Cobertura</span>'}</td>
+                    <td class="align-middle text-muted" style="font-size:0.8rem;">${bestC ? bestC.Ruta : '--'}</td>
+                    <td class="text-secondary align-middle">
+                        <span style="font-weight:600;">$${costUSD > 0 ? costUSD.toFixed(4) : '--'}</span>
+                        ${bestC && bestC.Moneda == 'EUR' ? `<div style="font-size:0.6rem; color:#94a3b8;">(Orig: €${parseFloat(bestC.Tarifa).toFixed(4)})</div>` : ''}
+                    </td>
+                    <td class="text-center align-middle"><span class="badge-margin ${badgeClass}">${margin.toFixed(1)}%</span></td>
+                </tr>
+            `);
+        });
+
+        // 3. TABLA MERCADO (PROVEEDORES)
+        thead.append(`
+            <tr class="table-dark"><th colspan="6" class="text-center py-2">🏢 TODAS LAS RUTAS DE PROVEEDORES</th></tr>
+            <tr class="bg-light">
+                <th colspan="2">Proveedor / Operador</th><th>Ruta</th><th class="text-center">Orig.</th><th class="text-center">USD</th><th class="text-center">MCC/MNC</th>
+            </tr>
+        `);
+
+        const todosLosCostos = [...infoCostos.rutas].sort((a,b) => obtenerCostoUSD(a) - obtenerCostoUSD(b));
+        todosLosCostos.forEach(c => {
+            const costUSD = obtenerCostoUSD(c);
+            tbody.append(`
+                <tr class="${costUSD === minCosto ? 'table-success' : ''}">
+                    <td colspan="2"><span class="fw-bold">${c.Proveedor}</span><div style="font-size:0.7rem;" class="text-muted">${c.Operador || 'Genérico'}</div></td>
+                    <td><span class="badge bg-secondary">${c.Ruta}</span></td>
+                    <td class="text-center text-muted" style="font-size:0.8rem;">${c.Moneda == 'EUR' ? '€' : '$'}${parseFloat(c.Tarifa).toFixed(4)}</td>
+                    <td class="text-center fw-bold">$${costUSD.toFixed(4)}</td>
+                    <td class="text-center"><small>${c.MCC || '0'}/${c.MNC || '0'}</small></td>
+                </tr>
+            `);
+        });
+    }
 
     function llenarFiltroProveedores() {
         const select = $('#filterProvider');
@@ -320,9 +345,9 @@
         const txt = $('#searchCountry').val().toLowerCase();
         const prov = $('#filterProvider').val();
         $('.card-item').each(function() {
-            const matchTxt = $(this).data('pais').includes(txt);
-            const matchProv = (prov === "ALL") || $(this).data('proveedores').includes(prov);
-            $(this).toggle(matchTxt && matchProv);
+            const mTxt = $(this).data('pais').includes(txt);
+            const mPrv = (prov === "ALL") || $(this).data('proveedores').includes(prov);
+            $(this).toggle(mTxt && mPrv);
         });
     }
 </script>
