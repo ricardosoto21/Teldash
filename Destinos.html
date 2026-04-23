@@ -224,75 +224,92 @@
     }
 
     function renderizarTablaModal() {
-        const infoCostos = globalData[paisActualModal] || { rutas: [] };
-        const infoVentas = globalSalesData[paisActualModal] || { rutas: [] };
-        const tbody = $('#modalTableBody');
-        const thead = $('#modalTableHead');
-        thead.empty(); tbody.empty();
+    const infoCostos = globalData[paisActualModal] || { rutas: [] };
+    const infoVentas = globalSalesData[paisActualModal] || { rutas: [] };
+    const tbody = $('#modalTableBody');
+    const thead = $('#modalTableHead');
+    thead.empty(); tbody.empty();
 
-        // 1. KPIs
-        let sumVenta = 0, minCosto = Infinity, maxMargen = -Infinity;
-        infoVentas.rutas.forEach(v => {
-            const rateV = parseFloat(v.Rate);
-            sumVenta += rateV;
-            const matchC = infoCostos.rutas.filter(c => c.Ruta === v.Ruta);
-            if(matchC.length > 0) {
-                const bestC = Math.min(...matchC.map(c => parseFloat(c.Tarifa)));
-                if(bestC < minCosto) minCosto = bestC;
-                const margin = ((rateV - bestC) / rateV) * 100;
-                if(margin > maxMargen) maxMargen = margin;
-            }
-        });
+    // --- KPIs SUPERIORES ---
+    let sumVenta = 0, minCosto = Infinity, maxMargen = -Infinity;
+    infoVentas.rutas.forEach(v => {
+        const rateV = parseFloat(v.Rate) || 0;
+        sumVenta += rateV;
+        // Buscamos el costo más bajo para esta ruta ignorando mayúsculas/minúsculas
+        const matchC = infoCostos.rutas.filter(c => c.Ruta.trim().toLowerCase() === v.Ruta.trim().toLowerCase());
+        if(matchC.length > 0) {
+            const bestC = Math.min(...matchC.map(c => parseFloat(c.Tarifa) || 0));
+            if(bestC < minCosto) minCosto = bestC;
+            const margin = rateV > 0 ? ((rateV - bestC) / rateV) * 100 : 0;
+            if(margin > maxMargen) maxMargen = margin;
+        }
+    });
 
-        $('#kpiContainer').html(`
-            <div class="kpi-row">
-                <div class="kpi-item"><div class="kpi-title">Venta Promedio</div><div class="kpi-val">$${(sumVenta/(infoVentas.rutas.length||1)).toFixed(4)}</div></div>
-                <div class="kpi-item"><div class="kpi-title">Costo Mínimo</div><div class="kpi-val">$${minCosto === Infinity ? '0.0000' : minCosto.toFixed(4)}</div></div>
-                <div class="kpi-item" style="border-left-color: #166534;"><div class="kpi-title">Margen Máximo</div><div class="kpi-val text-success">${maxMargen === -Infinity ? '0' : maxMargen.toFixed(1)}%</div></div>
-            </div>
-        `);
+    $('#kpiContainer').html(`
+        <div class="kpi-row">
+            <div class="kpi-item"><div class="kpi-title">Venta Promedio</div><div class="kpi-val">$${(sumVenta/(infoVentas.rutas.length||1)).toFixed(4)}</div></div>
+            <div class="kpi-item"><div class="kpi-title">Costo Mínimo</div><div class="kpi-val">$${minCosto === Infinity ? '0.0000' : minCosto.toFixed(4)}</div></div>
+            <div class="kpi-item" style="border-left-color: #166534;"><div class="kpi-title">Margen Máximo</div><div class="kpi-val text-success">${maxMargen === -Infinity ? '0' : maxMargen.toFixed(1)}%</div></div>
+        </div>
+    `);
 
-        // 2. Cabeceras
-        thead.html(`
+    // --- CABECERAS ---
+    thead.html(`
+        <tr>
+            <th colspan="2" class="section-sale">NUESTRA VENTA (CLIENTE)</th>
+            <th colspan="2" class="section-cost">COSTO PROVEEDOR</th>
+            <th rowspan="2" class="align-middle bg-light text-center">MARGEN</th>
+        </tr>
+        <tr>
+            <th class="section-sale">Ruta / Calidad</th><th class="section-sale">Precio ($)</th>
+            <th class="section-cost">Proveedor</th><th class="section-cost">Costo ($)</th>
+        </tr>
+    `);
+
+    // --- FILAS DE DATOS ---
+    infoVentas.rutas.forEach(v => {
+        const rateV = parseFloat(v.Rate) || 0;
+        let bestC;
+
+        if(vistaDetallada) {
+            // BUSQUEDA DETALLADA: Por Ruta + MCC + MNC (Muestra Operadores)
+            bestC = infoCostos.rutas.filter(c => 
+                c.Ruta.trim().toLowerCase() === v.Ruta.trim().toLowerCase() && 
+                c.MCC == v.MCC && c.MNC == v.MNC
+            ).sort((a,b) => parseFloat(a.Tarifa) - parseFloat(b.Tarifa))[0];
+        } else {
+            // BUSQUEDA RESUMIDA: Por nombre de Ruta solamente
+            bestC = infoCostos.rutas.filter(c => 
+                c.Ruta.trim().toLowerCase() === v.Ruta.trim().toLowerCase()
+            ).sort((a,b) => parseFloat(a.Tarifa) - parseFloat(b.Tarifa))[0];
+        }
+
+        const rateC = bestC ? parseFloat(bestC.Tarifa) : 0;
+        const margin = rateV > 0 ? ((rateV - rateC) / rateV) * 100 : 0;
+        const badgeClass = margin > 15 ? "margin-high" : (margin >= 5 ? "margin-mid" : "margin-low");
+
+        // Condicional para mostrar Operador solo en vista detallada
+        const labelDetalle = vistaDetallada 
+            ? `<div style="font-size: 0.7rem;" class="text-muted">${v.OperatorName || 'Operador Genérico'}</div>` 
+            : '';
+
+        tbody.append(`
             <tr>
-                <th colspan="2" class="section-sale">NUESTRA VENTA</th>
-                <th colspan="2" class="section-cost">MEJOR COSTO PROVEEDOR</th>
-                <th rowspan="2" class="align-middle bg-light text-center">MARGEN</th>
-            </tr>
-            <tr>
-                <th class="section-sale">Ruta / Tipo</th><th class="section-sale">Precio ($)</th>
-                <th class="section-cost">Proveedor</th><th class="section-cost">Costo ($)</th>
+                <td>
+                    <span class="fw-bold text-primary">${v.Ruta}</span>
+                    ${labelDetalle}
+                </td>
+                <td class="fw-bold text-primary">$${rateV.toFixed(4)}</td>
+                <td>${bestC ? bestC.Proveedor : '<span class="text-danger">Sin Cobertura</span>'}</td>
+                <td class="text-secondary">$${rateC > 0 ? rateC.toFixed(4) : '--'}</td>
+                <td class="text-center">
+                    <span class="badge-margin ${badgeClass}">${margin.toFixed(1)}%</span>
+                    <div style="font-size: 0.6rem; color: #64748b; margin-top:3px;">Utilidad: $${(rateV - rateC).toFixed(4)}</div>
+                </td>
             </tr>
         `);
-
-        // 3. Filas
-        infoVentas.rutas.forEach(v => {
-            const rateV = parseFloat(v.Rate);
-            let bestC;
-            if(vistaDetallada) {
-                bestC = infoCostos.rutas.filter(c => c.MCC == v.MCC && c.MNC == v.MNC && c.Ruta == v.Ruta).sort((a,b) => a.Tarifa - b.Tarifa)[0];
-            } else {
-                bestC = infoCostos.rutas.filter(c => c.Ruta == v.Ruta).sort((a,b) => a.Tarifa - b.Tarifa)[0];
-            }
-
-            const rateC = bestC ? parseFloat(bestC.Tarifa) : 0;
-            const margin = rateV > 0 ? ((rateV - rateC) / rateV) * 100 : 0;
-            const badgeClass = margin > 15 ? "margin-high" : (margin >= 5 ? "margin-mid" : "margin-low");
-
-            tbody.append(`
-                <tr>
-                    <td><span class="fw-bold text-primary">${v.Ruta}</span><div style="font-size: 0.7rem;" class="text-muted">${v.OperatorName || v.SMSType || ''}</div></td>
-                    <td class="fw-bold text-primary">$${rateV.toFixed(4)}</td>
-                    <td>${bestC ? bestC.Proveedor : '<span class="text-danger">Sin Ruta</span>'}</td>
-                    <td class="text-secondary">$${rateC.toFixed(4)}</td>
-                    <td class="text-center">
-                        <span class="badge-margin ${badgeClass}">${margin.toFixed(1)}%</span>
-                        <div style="font-size: 0.6rem; color: #64748b; margin-top:3px;">Utilidad: $${(rateV - rateC).toFixed(4)}</div>
-                    </td>
-                </tr>
-            `);
-        });
-    }
+    });
+}
 
     function llenarFiltroProveedores() {
         const select = $('#filterProvider');
