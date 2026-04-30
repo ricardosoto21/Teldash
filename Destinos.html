@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Teldash - Consola de Comando</title>
+    <title>Teldash - Gestión de Rutas</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     
@@ -11,42 +11,39 @@
         body { font-family: 'Inter', sans-serif; background-color: #f0f2f5; color: #1c1e21; }
         .header-bg { background: linear-gradient(135deg, #1e3c72, #2a5298); color: white; padding: 40px 0 30px; margin-bottom: 30px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
         
-        /* Estilos de Tarjetas */
-        .country-card { transition: transform 0.2s, box-shadow 0.2s; cursor: pointer; border: none; border-radius: 12px; }
-        .country-card:hover { transform: translateY(-5px); box-shadow: 0 10px 20px rgba(0,0,0,0.1) !important; border-color: #2a5298; }
+        /* Tarjetas */
+        .country-card { transition: transform 0.2s, box-shadow 0.2s; border: none; border-radius: 12px; overflow: hidden; }
+        .country-card:hover { transform: translateY(-5px); box-shadow: 0 10px 20px rgba(0,0,0,0.1) !important; }
         .card-title { font-weight: 800; font-size: 1.2rem; color: #333; }
         .search-box { border-radius: 20px; padding: 10px 20px; border: 1px solid #ddd; }
 
-        /* Vista de Rentabilidad */
-        .section-sale { background-color: #eef2ff !important; color: #3730a3 !important; border-bottom: 3px solid #4338ca !important; font-weight: 800; text-align: center; }
-        .section-cost { background-color: #f3f4f6 !important; color: #374151 !important; border-bottom: 3px solid #4b5563 !important; font-weight: 800; text-align: center; }
+        /* Botones de acción en tarjeta */
+        .btn-action { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; padding: 8px; border-radius: 8px; transition: 0.2s; }
+        .btn-prov { color: #4b5563; border: 1px solid #d1d5db; background: #f9fafb; }
+        .btn-prov:hover { background: #f3f4f6; color: #111827; }
+        .btn-sale { color: #3730a3; border: 1px solid #c7d2fe; background: #eef2ff; }
+        .btn-sale:hover { background: #e0e7ff; color: #312e81; }
+        .btn-live { color: #991b1b; border: 1px solid #fecaca; background: #fef2f2; }
 
-        .badge-margin { display: inline-block; padding: 5px 12px; border-radius: 8px; font-weight: 800; font-size: 0.9rem; }
-        .margin-high { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; } /* > 15% */
-        .margin-mid { background: #fef9c3; color: #854d0e; border: 1px solid #fef08a; }  /* 5-15% */
-        .margin-low { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }  /* < 5% */
-
-        .kpi-row { display: flex; gap: 12px; padding: 15px; background: #f8fafc; border-bottom: 1px solid #e2e8f0; }
-        .kpi-item { flex: 1; background: white; padding: 10px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); text-align: center; border-left: 4px solid #4338ca; }
-        .kpi-title { font-size: 0.65rem; text-transform: uppercase; color: #64748b; font-weight: 700; }
-        .kpi-val { font-size: 1.1rem; font-weight: 800; color: #1e293b; }
-
-        /* Modal Live Traffic */
+        /* Modales */
+        .modal-header-prov { background-color: #f3f4f6; border-bottom: 2px solid #e5e7eb; }
+        .modal-header-sale { background-color: #eef2ff; border-bottom: 2px solid #c7d2fe; color: #312e81; }
+        .table-details th { font-size: 0.75rem; text-transform: uppercase; color: #6b7280; background: #f9fafb; }
+        
+        /* Live Modal */
         .live-modal { display: none; position: fixed; z-index: 9999; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); backdrop-filter: blur(5px); }
-        .live-modal-content { background: #1e293b; margin: 3% auto; padding: 25px; width: 95%; max-width: 1200px; border-radius: 15px; border: 1px solid #334155; position: relative; color: #f8fafc; }
+        .live-modal-content { background: #1e293b; margin: 3% auto; padding: 25px; width: 95%; max-width: 1200px; border-radius: 15px; position: relative; color: #f8fafc; }
         .close-live { position: absolute; top: 15px; right: 20px; color: #ef4444; font-size: 30px; cursor: pointer; }
-        .live-table-container { margin-top: 20px; max-height: 500px; overflow-y: auto; border-radius: 8px; border: 1px solid #334155; }
-        .live-table-container table { width: 100%; border-collapse: collapse; }
-        .live-table-container th { background: #0f172a; padding: 12px; position: sticky; top: 0; color: #94a3b8; font-size: 11px; text-transform: uppercase; z-index: 10; }
-        .live-table-container td { padding: 12px; border-bottom: 1px solid #334155; font-size: 13px; color: #f8fafc; }
+        .live-table-container { margin-top: 20px; max-height: 500px; overflow-y: auto; }
+        .live-table-container table { width: 100%; color: #f8fafc; font-size: 13px; }
     </style>
 </head>
 <body>
 
 <div class="header-bg text-center">
     <div class="container">
-        <h1 class="fw-bold">🌍 Teldash: Consola de Comando</h1>
-        <p class="lead opacity-75">Monitoreo de Rentabilidad y Tráfico Live</p>
+        <h1 class="fw-bold">🌍 Teldash: Panel de Gestión</h1>
+        <p class="lead opacity-75">Control de Costos de Proveedores y Precios de Venta</p>
     </div>
 </div>
 
@@ -64,33 +61,54 @@
 
     <div id="loading" class="text-center my-5">
         <div class="spinner-border text-primary" style="width: 3rem; height: 3rem;" role="status"></div>
-        <p class="mt-3 text-muted fw-bold">Sincronizando mercados financieros...</p>
+        <p class="mt-3 text-muted fw-bold">Cargando base de datos dual...</p>
     </div>
 
     <div class="row" id="cardsContainer"></div>
 </div>
 
-<div class="modal fade" id="countryModal" tabindex="-1" aria-hidden="true">
+<div class="modal fade" id="provModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content">
-            <div class="modal-header d-flex justify-content-between align-items-center">
-                <h4 class="modal-title fw-bold mb-0" id="modalCountryName">País</h4>
+            <div class="modal-header modal-header-prov d-flex justify-content-between align-items-center">
+                <h4 class="modal-title fw-bold mb-0" id="modalProvName">Costos Proveedores</h4>
                 <div>
-                    <button id="toggleOpBtn" class="btn btn-sm btn-outline-primary me-3" onclick="toggleOperadores()">Ver Detalle Operadores</button>
+                    <button id="toggleOpBtn" class="btn btn-sm btn-outline-secondary me-3" onclick="toggleOperadores()">Ver Detalle Operadores</button>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
             </div>
             <div class="modal-body p-0">
-                <div id="kpiContainer"></div>
                 <div class="table-responsive">
                     <table class="table table-hover table-details mb-0">
-                        <thead id="modalTableHead"></thead>
-                        <tbody id="modalTableBody"></tbody>
+                        <thead id="modalProvHead"></thead>
+                        <tbody id="modalProvBody"></tbody>
                     </table>
                 </div>
             </div>
-            <div class="modal-footer bg-light">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="saleModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header modal-header-sale">
+                <h4 class="modal-title fw-bold" id="modalSaleName">Rutas de Venta</h4>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Cliente / Ruta</th>
+                                <th>Operador</th>
+                                <th class="text-center">Precio Venta ($)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="modalSaleBody"></tbody>
+                    </table>
+                </div>
             </div>
         </div>
     </div>
@@ -99,12 +117,12 @@
 <div id="liveModal" class="live-modal">
     <div class="live-modal-content">
         <span class="close-live" onclick="closeLive()">&times;</span>
-        <h2 id="live-title" style="color: #6366f1; font-weight: 800; margin-bottom: 20px;">📡 Tráfico en Vivo</h2>
+        <h2 id="live-title" style="color: #818cf8; font-weight: 800;">📡 Tráfico en Vivo</h2>
         <div class="live-table-container">
-            <table id="live-table">
+            <table id="live-table" class="table table-dark table-hover">
                 <thead>
                     <tr>
-                        <th>Hora</th><th>Número</th><th>Operador</th><th>Cliente</th><th>Ruta</th><th>Vendor</th><th>Status</th><th>Delay</th><th>Mensaje</th>
+                        <th>Hora</th><th>Número</th><th>Operador</th><th>Cliente</th><th>Ruta</th><th>Vendor</th><th>Status</th><th>Delay</th>
                     </tr>
                 </thead>
                 <tbody></tbody>
@@ -118,16 +136,16 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
 <script>
-    const API_URL = "https://script.google.com/macros/s/AKfycbyxvGAbaU4P_xNVQn7USe2sFs6kWvTzX_315fj_POtRO7nYIw7Q8Nzc7-pBt6XdFoUO/exec"; 
+    const API_URL = "https://script.google.com/macros/s/AKfycbxAs45hYUlPGmCyY4FijgoEa6ZfogMh3WOqQHUvc3FOUt_mhNtLaywoAZdibGVq7gob/exec"; 
     
-    let globalData = {};      // Costos (DATOS_MAESTROS)
-    let globalSalesData = {}; // Ventas (PRECIOS_VENTA)
+    let globalData = {};      // Costos
+    let globalSalesData = {}; // Ventas
     let allProviders = new Set(); 
     let banderasISO = {}; 
     let trafficVolumes = {}; 
-    let paisActualModal = "";
+    let paisActual = "";
     let vistaDetallada = false;
-    let tasaEUR_USD = 1.08; // Valor base por seguridad
+    let tasaEUR_USD = 1.08;
 
     $(document).ready(function() {
         Promise.all([
@@ -137,7 +155,6 @@
             fetch('https://api.frankfurter.app/latest?from=EUR&to=USD').then(r => r.json()).catch(() => ({rates:{USD:1.08}}))
         ])
         .then(([paisesMundo, dualData, bufferLive, fxData]) => {
-            // Cargar tasa de cambio
             if(fxData?.rates?.USD) tasaEUR_USD = fxData.rates.USD;
 
             paisesMundo.forEach(p => {
@@ -154,76 +171,54 @@
             }
 
             document.getElementById('loading').style.display = 'none';
-            procesarDatosDual(dualData);
+            
+            // Mapeo de datos
+            dualData.costos.forEach(row => {
+                const p = row.País || "Desconocido";
+                if (!globalData[p]) globalData[p] = { nombre: p, proveedores: new Set(), rutas: [] };
+                globalData[p].proveedores.add(row.Proveedor);
+                globalData[p].rutas.push(row);
+                allProviders.add(row.Proveedor);
+            });
+            dualData.ventas.forEach(row => {
+                const p = row.CountryRealName || "Desconocido";
+                if (!globalSalesData[p]) globalSalesData[p] = { rutas: [] };
+                globalSalesData[p].rutas.push(row);
+            });
+
             renderizarTarjetas();
             llenarFiltroProveedores();
-        })
-        .catch(err => {
-            console.error("Error Inicialización:", err);
-            document.getElementById('loading').innerHTML = '<div class="alert alert-danger shadow">Error de conexión con la base de datos.</div>';
         });
 
         $('#searchCountry').on('keyup', filtrarTarjetas);
         $('#filterProvider').on('change', filtrarTarjetas);
     });
 
-    function procesarDatosDual(data) {
-        // Mapear Costos
-        data.costos.forEach(row => {
-            const pais = row.País || "Desconocido";
-            if (!globalData[pais]) globalData[pais] = { nombre: pais, proveedores: new Set(), rutas: [] };
-            globalData[pais].proveedores.add(row.Proveedor);
-            globalData[pais].rutas.push(row);
-            allProviders.add(row.Proveedor);
-        });
-        // Mapear Ventas
-        data.ventas.forEach(row => {
-            const pais = row.CountryRealName || "Desconocido";
-            if (!globalSalesData[pais]) globalSalesData[pais] = { rutas: [] };
-            globalSalesData[pais].rutas.push(row);
-        });
-    }
-
-    function obtenerCostoUSD(rowCosto) {
-        if (!rowCosto) return 0;
-        let tarifa = parseFloat(rowCosto.Tarifa) || 0;
-        let moneda = (rowCosto.Moneda || 'USD').toString().trim().toUpperCase();
-        return (moneda === 'EUR' || moneda === 'EURO') ? (tarifa * tasaEUR_USD) : tarifa;
-    }
-
-    function encontrarMejorCosto(mcc, mnc) {
-        const infoCostos = globalData[paisActualModal] || { rutas: [] };
-        let candidatos = infoCostos.rutas;
-        if (mcc && mnc && mcc != '0' && mcc != '000') {
-            let exactos = candidatos.filter(c => c.MCC == mcc && c.MNC == mnc);
-            if (exactos.length > 0) candidatos = exactos;
-        }
-        if (candidatos.length === 0) return null;
-        return candidatos.sort((a, b) => obtenerCostoUSD(a) - obtenerCostoUSD(b))[0];
-    }
-
     function renderizarTarjetas() {
         const container = $('#cardsContainer');
         container.empty();
-        const paisesOrdenados = Object.keys(globalData).sort((a, b) => (trafficVolumes[b] || 0) - (trafficVolumes[a] || 0));
+        const paises = Object.keys(globalData).sort((a, b) => (trafficVolumes[b] || 0) - (trafficVolumes[a] || 0));
 
-        paisesOrdenados.forEach(nombrePais => {
-            const info = globalData[nombrePais];
-            const codigoIso = banderasISO[nombrePais.toLowerCase().trim()];
-            const flagHTML = codigoIso ? `<img src="https://flagcdn.com/w40/${codigoIso}.png" width="40" class="mb-3 rounded shadow-sm">` : '🌐';
-            const liveBadge = trafficVolumes[nombrePais] ? `<div style="font-size: 11px; color: #ef4444; font-weight: bold; margin-bottom: 5px;">🔥 ${trafficVolumes[nombrePais]} SMS (Live)</div>` : '';
+        paises.forEach(nombre => {
+            const info = globalData[nombre];
+            const codigoIso = banderasISO[nombre.toLowerCase().trim()];
+            const flag = codigoIso ? `<img src="https://flagcdn.com/w40/${codigoIso}.png" width="40" class="mb-3 rounded shadow-sm">` : '🌐';
+            const live = trafficVolumes[nombre] ? `<div class="mb-2 text-danger fw-bold" style="font-size: 11px;">🔥 ${trafficVolumes[nombre]} SMS</div>` : '';
 
             container.append(`
-                <div class="col-xl-3 col-lg-4 col-md-6 mb-4 card-item" data-pais="${nombrePais.toLowerCase()}" data-proveedores="${Array.from(info.proveedores).join(',').toLowerCase()}">
-                    <div class="card country-card h-100 d-flex flex-column" onclick="abrirDetalle('${nombrePais}')">
-                        <div class="card-body text-center flex-grow-1">
-                            ${flagHTML}
-                            <h5 class="card-title">${nombrePais}</h5>
-                            ${liveBadge}
-                            <span class="badge bg-success" style="border-radius:20px;">${info.proveedores.size} Proveedores</span>
-                        </div>
-                        <div class="card-footer bg-white border-0 pb-3 text-center">
-                            <button onclick="event.stopPropagation(); showLiveTraffic('${nombrePais}')" class="btn btn-outline-danger btn-sm w-100">📡 Ver Live</button>
+                <div class="col-xl-3 col-lg-4 col-md-6 mb-4 card-item" data-pais="${nombre.toLowerCase()}" data-proveedores="${Array.from(info.proveedores).join(',').toLowerCase()}">
+                    <div class="card country-card h-100 shadow-sm bg-white">
+                        <div class="card-body text-center">
+                            ${flag}
+                            <h5 class="card-title mb-1">${nombre}</h5>
+                            ${live}
+                            <div class="badge bg-light text-dark border mb-3">${info.proveedores.size} Proveedores</div>
+                            
+                            <div class="d-grid gap-2">
+                                <button onclick="abrirProv('${nombre}')" class="btn btn-action btn-prov">📦 Costos Prov.</button>
+                                <button onclick="abrirVentas('${nombre}')" class="btn btn-action btn-sale">💰 Precios Venta</button>
+                                <button onclick="showLiveTraffic('${nombre}')" class="btn btn-action btn-live">📡 Tráfico Live</button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -231,110 +226,80 @@
         });
     }
 
-    function abrirDetalle(nombrePais) {
-        paisActualModal = nombrePais;
+    // --- Lógica Modal Proveedores (Restaurada) ---
+    function abrirProv(nombre) {
+        paisActual = nombre;
         vistaDetallada = false;
         $('#toggleOpBtn').text('Ver Detalle Operadores');
-        renderizarTablaModal();
-        const myModal = new bootstrap.Modal(document.getElementById('countryModal'));
-        myModal.show();
+        renderizarTablaProv();
+        new bootstrap.Modal(document.getElementById('provModal')).show();
     }
 
     function toggleOperadores() {
         vistaDetallada = !vistaDetallada;
-        $('#toggleOpBtn').text(vistaDetallada ? 'Vista Resumida' : 'Ver Detalle Operadores');
-        renderizarTablaModal();
+        $('#toggleOpBtn').text(vistaDetallada ? 'Ocultar Operadores' : 'Ver Detalle Operadores');
+        renderizarTablaProv();
     }
 
-    function renderizarTablaModal() {
-        const infoCostos = globalData[paisActualModal] || { rutas: [] };
-        const infoVentas = globalSalesData[paisActualModal] || { rutas: [] };
-        const tbody = $('#modalTableBody');
-        const thead = $('#modalTableHead');
+    function renderizarTablaProv() {
+        const rutas = globalData[paisActual]?.rutas || [];
+        const thead = $('#modalProvHead');
+        const tbody = $('#modalProvBody');
         thead.empty(); tbody.empty();
 
-        // 1. KPIs
-        let sumVenta = 0, minCosto = Infinity, maxMargen = -Infinity;
-        infoVentas.rutas.forEach(v => {
-            const rateV = parseFloat(v.Rate) || 0;
-            sumVenta += rateV;
-            const bestC = encontrarMejorCosto(v.MCC, v.MNC);
-            const costUSD = obtenerCostoUSD(bestC);
-            if(costUSD > 0 && costUSD < minCosto) minCosto = costUSD;
-            const margin = rateV > 0 ? ((rateV - costUSD) / rateV) * 100 : 0;
-            if(margin > maxMargen) maxMargen = margin;
-        });
-
-        $('#kpiContainer').html(`
-            <div class="kpi-row">
-                <div class="kpi-item"><div class="kpi-title">Venta Promedio</div><div class="kpi-val">$${(sumVenta/(infoVentas.rutas.length||1)).toFixed(4)}</div></div>
-                <div class="kpi-item"><div class="kpi-title">Costo Mínimo (USD)</div><div class="kpi-val">$${minCosto === Infinity ? '0.0000' : minCosto.toFixed(4)}</div></div>
-                <div class="kpi-item" style="border-left-color: #166534;"><div class="kpi-title">Margen Máximo</div><div class="kpi-val text-success">${maxMargen === -Infinity ? '0' : maxMargen.toFixed(1)}%</div></div>
-            </div>
-        `);
-
-        // 2. TABLA RENTABILIDAD
-        thead.append(`
-            <tr class="table-dark"><th colspan="6" class="text-center py-2">📊 COMPARATIVA DE RENTABILIDAD</th></tr>
-            <tr>
-                <th class="section-sale">Cliente / Ruta</th><th class="section-sale">Precio ($)</th>
-                <th class="section-cost">Proveedor</th><th class="section-cost">Ruta Prov.</th><th class="section-cost">Costo (USD)</th>
-                <th class="bg-light text-center">MARGEN</th>
-            </tr>
-        `);
-
-        // Agrupación para evitar duplicados en ventas
-        let resumenVentas = {};
-        infoVentas.rutas.forEach(v => {
-            const key = vistaDetallada ? `${v.Cliente}_${v.Ruta}_${v.MCC}_${v.MNC}` : `${v.Cliente}_${v.Ruta}`;
-            if (!resumenVentas[key]) resumenVentas[key] = { ...v, rateV: parseFloat(v.Rate) };
-        });
-
-        Object.values(resumenVentas).forEach(v => {
-            const bestC = encontrarMejorCosto(v.MCC, v.MNC);
-            const costUSD = obtenerCostoUSD(bestC);
-            const margin = v.rateV > 0 && costUSD > 0 ? ((v.rateV - costUSD) / v.rateV) * 100 : 0;
-            const badgeClass = margin > 15 ? "margin-high" : (margin >= 5 ? "margin-mid" : "margin-low");
-
-            tbody.append(`
-                <tr style="border-bottom: 2px solid #e2e8f0;">
-                    <td><span class="fw-bold text-primary">${v.Cliente || 'Genérico'} - ${v.Ruta}</span>
-                        ${vistaDetallada ? `<div style="font-size: 0.7rem;" class="text-muted">${v.OperatorName || ''} (${v.MCC}/${v.MNC})</div>` : ''}
-                    </td>
-                    <td class="fw-bold text-primary align-middle">$${v.rateV.toFixed(4)}</td>
-                    <td class="align-middle">${bestC ? bestC.Proveedor : '<span class="text-danger">Sin Cobertura</span>'}</td>
-                    <td class="align-middle text-muted" style="font-size:0.8rem;">${bestC ? bestC.Ruta : '--'}</td>
-                    <td class="text-secondary align-middle">
-                        <span style="font-weight:600;">$${costUSD > 0 ? costUSD.toFixed(4) : '--'}</span>
-                        ${bestC && bestC.Moneda == 'EUR' ? `<div style="font-size:0.6rem; color:#94a3b8;">(Orig: €${parseFloat(bestC.Tarifa).toFixed(4)})</div>` : ''}
-                    </td>
-                    <td class="text-center align-middle"><span class="badge-margin ${badgeClass}">${margin.toFixed(1)}%</span></td>
-                </tr>
-            `);
-        });
-
-        // 3. TABLA MERCADO (PROVEEDORES)
-        thead.append(`
-            <tr class="table-dark"><th colspan="6" class="text-center py-2">🏢 TODAS LAS RUTAS DE PROVEEDORES</th></tr>
-            <tr class="bg-light">
-                <th colspan="2">Proveedor / Operador</th><th>Ruta</th><th class="text-center">Orig.</th><th class="text-center">USD</th><th class="text-center">MCC/MNC</th>
-            </tr>
-        `);
-
-        const todosLosCostos = [...infoCostos.rutas].sort((a,b) => obtenerCostoUSD(a) - obtenerCostoUSD(b));
-        todosLosCostos.forEach(c => {
-            const costUSD = obtenerCostoUSD(c);
-            tbody.append(`
-                <tr class="${costUSD === minCosto ? 'table-success' : ''}">
-                    <td colspan="2"><span class="fw-bold">${c.Proveedor}</span><div style="font-size:0.7rem;" class="text-muted">${c.Operador || 'Genérico'}</div></td>
-                    <td><span class="badge bg-secondary">${c.Ruta}</span></td>
-                    <td class="text-center text-muted" style="font-size:0.8rem;">${c.Moneda == 'EUR' ? '€' : '$'}${parseFloat(c.Tarifa).toFixed(4)}</td>
-                    <td class="text-center fw-bold">$${costUSD.toFixed(4)}</td>
-                    <td class="text-center"><small>${c.MCC || '0'}/${c.MNC || '0'}</small></td>
-                </tr>
-            `);
-        });
+        if(vistaDetallada) {
+            thead.html('<tr><th>Proveedor</th><th>Ruta</th><th>Operador</th><th class="text-center">Tarifa</th><th class="text-center">Moneda</th></tr>');
+            rutas.forEach(r => {
+                tbody.append(`<tr>
+                    <td class="fw-bold text-primary">${r.Proveedor}</td>
+                    <td><span class="badge bg-secondary">${r.Ruta}</span></td>
+                    <td><small>${r.Operador || 'Todos'}</small></td>
+                    <td class="text-center fw-bold">${parseFloat(r.Tarifa).toFixed(4)}</td>
+                    <td class="text-center"><span class="badge ${r.Moneda == 'EUR' ? 'bg-info' : 'bg-success'}">${r.Moneda}</span></td>
+                </tr>`);
+            });
+        } else {
+            thead.html('<tr><th>Proveedor</th><th>Ruta</th><th class="text-center">Tarifa Min</th><th class="text-center">Moneda</th></tr>');
+            // Agrupación básica
+            let agrupado = {};
+            rutas.forEach(r => {
+                const key = `${r.Proveedor}_${r.Ruta}`;
+                if(!agrupado[key] || parseFloat(r.Tarifa) < agrupado[key].Tarifa) agrupado[key] = r;
+            });
+            Object.values(agrupado).forEach(r => {
+                tbody.append(`<tr>
+                    <td class="fw-bold text-primary">${r.Proveedor}</td>
+                    <td><span class="badge bg-secondary">${r.Ruta}</span></td>
+                    <td class="text-center fw-bold">${parseFloat(r.Tarifa).toFixed(4)}</td>
+                    <td class="text-center"><span class="badge ${r.Moneda == 'EUR' ? 'bg-info' : 'bg-success'}">${r.Moneda}</span></td>
+                </tr>`);
+            });
+        }
+        $('#modalProvName').text(`Costos Proveedores: ${paisActual}`);
     }
+
+    // --- Lógica Modal Ventas (Nueva) ---
+    function abrirVentas(nombre) {
+        const rutas = globalSalesData[nombre]?.rutas || [];
+        const tbody = $('#modalSaleBody');
+        tbody.empty();
+        
+        if(rutas.length === 0) {
+            tbody.append('<tr><td colspan="3" class="text-center p-4">No hay rutas de venta cargadas para este país.</td></tr>');
+        } else {
+            rutas.sort((a,b) => (a.Cliente || '').localeCompare(b.Cliente || '')).forEach(r => {
+                tbody.append(`<tr>
+                    <td><div class="fw-bold text-indigo">${r.Cliente || 'Genérico'}</div><div class="text-muted" style="font-size: 11px;">${r.Ruta}</div></td>
+                    <td class="align-middle"><small>${r.OperatorName || 'Todos'}</small></td>
+                    <td class="text-center align-middle fw-bold text-primary">$${parseFloat(rowRate(r)).toFixed(4)}</td>
+                </tr>`);
+            });
+        }
+        $('#modalSaleName').text(`Precios de Venta: ${nombre}`);
+        new bootstrap.Modal(document.getElementById('saleModal')).show();
+    }
+
+    function rowRate(r) { return r.Rate || r.Tarifa || 0; }
 
     function llenarFiltroProveedores() {
         const select = $('#filterProvider');
@@ -350,6 +315,9 @@
             $(this).toggle(mTxt && mPrv);
         });
     }
+
+    // Live Traffic
+    function closeLive() { document.getElementById('liveModal').style.display = 'none'; }
 </script>
 <script src="js/live_logic.js"></script>
 </body>
