@@ -50,7 +50,7 @@
 <div class="container mb-5">
     <div class="row mb-4 justify-content-center">
         <div class="col-md-5 mb-2">
-            <input type="text" id="searchCountry" class="form-control search-box" placeholder="🔍 Buscar País...">
+            <input type="text" id="searchCountry" class="form-control search-box" placeholder="🔍 Buscar País (Ej. Chile)...">
         </div>
         <div class="col-md-4 mb-2">
             <select id="filterProvider" class="form-select search-box">
@@ -103,7 +103,7 @@
                             <tr>
                                 <th>Cliente / Ruta</th>
                                 <th>Operador</th>
-                                <th class="text-center">Precio Venta ($)</th>
+                                <th class="text-center">Precio Venta (USD)</th>
                             </tr>
                         </thead>
                         <tbody id="modalSaleBody"></tbody>
@@ -136,30 +136,38 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
 <script>
+    // 🔴 RECUERDA: Si te sale el error rojo de formato, debes actualizar este link creando una NUEVA IMPLEMENTACIÓN
     const API_URL = "https://script.google.com/macros/s/AKfycbxAs45hYUlPGmCyY4FijgoEa6ZfogMh3WOqQHUvc3FOUt_mhNtLaywoAZdibGVq7gob/exec"; 
     
-    let globalData = {};      // Costos
-    let globalSalesData = {}; // Ventas
+    let globalData = {};      // Costos (Proveedores)
+    let globalSalesData = {}; // Ventas (Clientes)
     let allProviders = new Set(); 
     let banderasISO = {}; 
     let trafficVolumes = {}; 
     let paisActual = "";
     let vistaDetallada = false;
-    let tasaEUR_USD = 1.08;
 
     $(document).ready(function() {
+        // 🎯 Ya no hay API de divisas, solo cargamos la data interna pura
         Promise.all([
             fetch('https://restcountries.com/v3.1/all?fields=name,cca2').then(r => r.json()),
-            fetch(API_URL).then(r => r.json()),
-            fetch(`datos/live_traffic.xlsx?t=${new Date().getTime()}`).then(r => r.arrayBuffer()).catch(() => null),
-            fetch('https://api.frankfurter.app/latest?from=EUR&to=USD').then(r => r.json()).catch(() => ({rates:{USD:1.08}}))
+            fetch(API_URL).then(r => r.json()).catch(() => null),
+            fetch(`datos/live_traffic.xlsx?t=${new Date().getTime()}`).then(r => r.arrayBuffer()).catch(() => null)
         ])
-        .then(([paisesMundo, dualData, bufferLive, fxData]) => {
-            if(fxData?.rates?.USD) tasaEUR_USD = fxData.rates.USD;
+        .then(([paisesMundo, dualData, bufferLive]) => {
+            
+            // 🛡️ ESCUDO ANTI-ERRORES: Verifica si Google mandó bien la información
+            if (!dualData || !dualData.costos || !dualData.ventas) {
+                document.getElementById('loading').innerHTML = `
+                    <div class="alert alert-danger fw-bold shadow mx-auto" style="max-width: 600px;">
+                        🚨 ERROR DE FORMATO EN GOOGLE SHEETS<br><br>
+                        Tu Google Apps Script no está enviando las variables 'costos' y 'ventas'.<br>
+                        Debes ir a Apps Script > Implementar > <b>NUEVA implementación</b> y actualizar el API_URL en el código.
+                    </div>`;
+                return; // Detiene la ejecución para no generar el error de "forEach"
+            }
 
-            paisesMundo.forEach(p => {
-                banderasISO[p.name.common.toLowerCase()] = p.cca2.toLowerCase();
-            });
+            paisesMundo.forEach(p => { banderasISO[p.name.common.toLowerCase()] = p.cca2.toLowerCase(); });
             banderasISO["usa"] = "us"; banderasISO["uk"] = "gb";
 
             if (bufferLive) {
@@ -172,7 +180,7 @@
 
             document.getElementById('loading').style.display = 'none';
             
-            // Mapeo de datos
+            // Mapeo de datos (Costos)
             dualData.costos.forEach(row => {
                 const p = row.País || "Desconocido";
                 if (!globalData[p]) globalData[p] = { nombre: p, proveedores: new Set(), rutas: [] };
@@ -180,6 +188,7 @@
                 globalData[p].rutas.push(row);
                 allProviders.add(row.Proveedor);
             });
+            // Mapeo de datos (Ventas)
             dualData.ventas.forEach(row => {
                 const p = row.CountryRealName || "Desconocido";
                 if (!globalSalesData[p]) globalSalesData[p] = { rutas: [] };
@@ -226,7 +235,7 @@
         });
     }
 
-    // --- Lógica Modal Proveedores (Restaurada) ---
+    // --- LÓGICA MODAL PROVEEDORES (Costos puros) ---
     function abrirProv(nombre) {
         paisActual = nombre;
         vistaDetallada = false;
@@ -250,35 +259,38 @@
         if(vistaDetallada) {
             thead.html('<tr><th>Proveedor</th><th>Ruta</th><th>Operador</th><th class="text-center">Tarifa</th><th class="text-center">Moneda</th></tr>');
             rutas.forEach(r => {
+                const tarifa = parseFloat(r.Tarifa) || 0;
                 tbody.append(`<tr>
                     <td class="fw-bold text-primary">${r.Proveedor}</td>
                     <td><span class="badge bg-secondary">${r.Ruta}</span></td>
                     <td><small>${r.Operador || 'Todos'}</small></td>
-                    <td class="text-center fw-bold">${parseFloat(r.Tarifa).toFixed(4)}</td>
-                    <td class="text-center"><span class="badge ${r.Moneda == 'EUR' ? 'bg-info' : 'bg-success'}">${r.Moneda}</span></td>
+                    <td class="text-center fw-bold">${tarifa.toFixed(4)}</td>
+                    <td class="text-center"><span class="badge ${r.Moneda === 'EUR' ? 'bg-info' : 'bg-success'}">${r.Moneda || 'USD'}</span></td>
                 </tr>`);
             });
         } else {
             thead.html('<tr><th>Proveedor</th><th>Ruta</th><th class="text-center">Tarifa Min</th><th class="text-center">Moneda</th></tr>');
-            // Agrupación básica
+            // Agrupar por Proveedor + Ruta para mostrar solo la tarifa más baja
             let agrupado = {};
             rutas.forEach(r => {
                 const key = `${r.Proveedor}_${r.Ruta}`;
-                if(!agrupado[key] || parseFloat(r.Tarifa) < agrupado[key].Tarifa) agrupado[key] = r;
+                const tarifa = parseFloat(r.Tarifa) || 0;
+                if(!agrupado[key] || tarifa < parseFloat(agrupado[key].Tarifa)) agrupado[key] = r;
             });
             Object.values(agrupado).forEach(r => {
+                const tarifa = parseFloat(r.Tarifa) || 0;
                 tbody.append(`<tr>
                     <td class="fw-bold text-primary">${r.Proveedor}</td>
                     <td><span class="badge bg-secondary">${r.Ruta}</span></td>
-                    <td class="text-center fw-bold">${parseFloat(r.Tarifa).toFixed(4)}</td>
-                    <td class="text-center"><span class="badge ${r.Moneda == 'EUR' ? 'bg-info' : 'bg-success'}">${r.Moneda}</span></td>
+                    <td class="text-center fw-bold">${tarifa.toFixed(4)}</td>
+                    <td class="text-center"><span class="badge ${r.Moneda === 'EUR' ? 'bg-info' : 'bg-success'}">${r.Moneda || 'USD'}</span></td>
                 </tr>`);
             });
         }
         $('#modalProvName').text(`Costos Proveedores: ${paisActual}`);
     }
 
-    // --- Lógica Modal Ventas (Nueva) ---
+    // --- LÓGICA MODAL VENTAS (Ventas puras) ---
     function abrirVentas(nombre) {
         const rutas = globalSalesData[nombre]?.rutas || [];
         const tbody = $('#modalSaleBody');
@@ -287,19 +299,22 @@
         if(rutas.length === 0) {
             tbody.append('<tr><td colspan="3" class="text-center p-4">No hay rutas de venta cargadas para este país.</td></tr>');
         } else {
+            // Ordenar por Cliente
             rutas.sort((a,b) => (a.Cliente || '').localeCompare(b.Cliente || '')).forEach(r => {
+                const precioVenta = parseFloat(r.Rate || r.Tarifa || 0);
                 tbody.append(`<tr>
-                    <td><div class="fw-bold text-indigo">${r.Cliente || 'Genérico'}</div><div class="text-muted" style="font-size: 11px;">${r.Ruta}</div></td>
+                    <td>
+                        <div class="fw-bold text-indigo">${r.Cliente || 'Genérico'}</div>
+                        <div class="text-muted" style="font-size: 11px;">${r.Ruta}</div>
+                    </td>
                     <td class="align-middle"><small>${r.OperatorName || 'Todos'}</small></td>
-                    <td class="text-center align-middle fw-bold text-primary">$${parseFloat(rowRate(r)).toFixed(4)}</td>
+                    <td class="text-center align-middle fw-bold text-primary">$${precioVenta.toFixed(4)}</td>
                 </tr>`);
             });
         }
         $('#modalSaleName').text(`Precios de Venta: ${nombre}`);
         new bootstrap.Modal(document.getElementById('saleModal')).show();
     }
-
-    function rowRate(r) { return r.Rate || r.Tarifa || 0; }
 
     function llenarFiltroProveedores() {
         const select = $('#filterProvider');
@@ -316,7 +331,7 @@
         });
     }
 
-    // Live Traffic
+    // Live Traffic logic
     function closeLive() { document.getElementById('liveModal').style.display = 'none'; }
 </script>
 <script src="js/live_logic.js"></script>
