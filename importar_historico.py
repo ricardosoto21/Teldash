@@ -6,12 +6,25 @@ import time
 # --- CONFIGURACIÓN ---
 USUARIO = os.environ.get('SMS_USER')
 CLAVE = os.environ.get('SMS_PASS')
-DIAS_ATRAS = 730 
+DIAS_ATRAS = 180 # 👈 Ajusta los días que quieras reconstruir (180 = 6 meses)
 RUTA_EXCEL = 'datos/reporte_actual.xlsx'
 
 URL_INICIO = 'http://65.108.69.39:5660/'
 URL_LOGIN = 'http://65.108.69.39:5660/Home/CheckLogin'
 URL_DESCARGA = 'http://65.108.69.39:5660/DLRWholesaleReport/DownloadExcel'
+
+# 🚨 LISTA OFICIAL DE DIMENSIONES (Garantiza paridad absoluta)
+DIMENSIONES = [
+    'SubmitDate', 'CompanyName', 'SMPPAccountName', 'SMPPUsername', 'MCC', 'MNC', 
+    'OperatorName', 'DLRStatus', 'ErrorDescription', 'VendorAccountName', 'SenderID', 
+    'CountryRealName', 'CurrencyCode', 'TerminationCurrencyCode', 'SMSSource', 
+    'SMSType', 'MessageType', 'ErrorCode'
+]
+
+METRICAS = {
+    'MessageParts': 'sum', 'ClientCost': 'sum', 'TerminationCost': 'sum',
+    'ClientCostUSD': 'sum', 'TerminationCostUSD': 'sum', 'DLRDelay': 'mean'
+}
 
 session = requests.Session()
 session.headers.update({'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'})
@@ -42,20 +55,23 @@ def obtener_tasa_diaria(fecha_obj, moneda):
 def convertir_y_agrupar_optimizado(df):
     if df.empty: return df
     
-    # --- LA SOLUCIÓN: Estandarizar el nombre del Operador ---
-    if 'Operator' in df.columns and 'OperatorName' not in df.columns:
-        df = df.rename(columns={'Operator': 'OperatorName'})
-    # Si por alguna razón viene completamente vacía o sin operador, la creamos para que no falle
-    if 'OperatorName' not in df.columns:
-        df['OperatorName'] = 'Desconocido'
-    # --------------------------------------------------------
+    # 🎯 LA MAGIA: Renombrar para que los nombres coincidan y no se borre la moneda
+    renombramientos = {
+        'Operator': 'OperatorName',
+        'ClientCurrency': 'CurrencyCode',
+        'VendorCurrency': 'TerminationCurrencyCode',
+        'TerminationCurrency': 'TerminationCurrencyCode'
+    }
+    df = df.rename(columns=renombramientos)
 
+    # Convertir fechas
     df['SubmitDate'] = pd.to_datetime(df['SubmitDate']).dt.date
     
-    col_client_cur = 'CurrencyCode' if 'CurrencyCode' in df.columns else ('ClientCurrency' if 'ClientCurrency' in df.columns else None)
-    col_vendor_cur = 'TerminationCurrencyCode' if 'TerminationCurrencyCode' in df.columns else ('VendorCurrency' if 'VendorCurrency' in df.columns else None)
-    if not col_client_cur: df['CurrencyCode'] = 'USD'; col_client_cur = 'CurrencyCode'
-    if not col_vendor_cur: df['TerminationCurrencyCode'] = 'USD'; col_vendor_cur = 'TerminationCurrencyCode'
+    # Asegurar que existan las columnas, por defecto USD
+    if 'CurrencyCode' not in df.columns: df['CurrencyCode'] = 'USD'
+    if 'TerminationCurrencyCode' not in df.columns: df['TerminationCurrencyCode'] = 'USD'
+    df['CurrencyCode'] = df['CurrencyCode'].fillna('USD')
+    df['TerminationCurrencyCode'] = df['TerminationCurrencyCode'].fillna('USD')
 
     # Limpieza DLRDelay
     if 'DLRDelay' in df.columns:
@@ -63,17 +79,18 @@ def convertir_y_agrupar_optimizado(df):
     else:
         df['DLRDelay'] = 0
 
-    df['ClientCostUSD'] = df.apply(lambda x: x['ClientCost'] * obtener_tasa_diaria(x['SubmitDate'], x[col_client_cur]), axis=1)
-    df['TerminationCostUSD'] = df.apply(lambda x: x['TerminationCost'] * obtener_tasa_diaria(x['SubmitDate'], x[col_vendor_cur]), axis=1)
+    # Conversión a USD individual por fila
+    df['ClientCostUSD'] = df.apply(lambda x: x.get('ClientCost', 0) * obtener_tasa_diaria(x['SubmitDate'], x['CurrencyCode']), axis=1)
+    df['TerminationCostUSD'] = df.apply(lambda x: x.get('TerminationCost', 0) * obtener_tasa_diaria(x['SubmitDate'], x['TerminationCurrencyCode']), axis=1)
 
-    # Agrupación estricta para el Dashboard (elimina solapamientos internos)
-    resumen = df.groupby(['SubmitDate', 'CompanyName', 'CountryRealName', 'OperatorName', 'DLRStatus']).agg({
-        'MessageParts': 'sum', 
-        'ClientCostUSD': 'sum', 
-        'TerminationCostUSD': 'sum',
-        'DLRDelay': 'mean'
-    }).reset_index()
-    
+    # 🛡️ FORZAR DIMENSIONES (Crear columnas si faltan, para que el groupby no falle)
+    for col in DIMENSIONES:
+        if col not in df.columns: df[col] = "N/A"
+    for col in METRICAS.keys():
+        if col not in df.columns: df[col] = 0.0
+
+    # Agrupación con dimensiones garantizadas (No mezcla EUR con USD)
+    resumen = df.groupby(DIMENSIONES).agg(METRICAS).reset_index()
     return resumen
 
 def login():
@@ -90,15 +107,13 @@ if __name__ == "__main__":
     login()
     all_data = []
     
-    # Trabajamos solo con las fechas (sin horas) para evitar el solapamiento
     fecha_cursor = datetime.now().date() 
     fecha_limite = fecha_cursor - timedelta(days=DIAS_ATRAS)
 
     while fecha_cursor > fecha_limite:
         f_fin = fecha_cursor
-        f_ini = fecha_cursor - timedelta(days=6) # Toma bloques de 7 días exactos
+        f_ini = fecha_cursor - timedelta(days=6) 
         
-        # Formateamos los textos asegurando inicio y fin de día
         ini_str = f_ini.strftime('%Y-%m-%d 00:00:00')
         fin_str = f_fin.strftime('%Y-%m-%d 23:59:59')
         
@@ -116,7 +131,6 @@ if __name__ == "__main__":
         except Exception as e:
             print(f"⚠️ Salto por error: {e}", flush=True)
         
-        # El cursor salta AL DÍA ANTERIOR del inicio del bloque actual
         fecha_cursor = f_ini - timedelta(days=1)
         time.sleep(2)
 
@@ -124,10 +138,8 @@ if __name__ == "__main__":
         print("\n⚙️ Unificando y limpiando solapamientos finales...", flush=True)
         df_completo = pd.concat(all_data, ignore_index=True)
         
-        # Agrupación final maestra (Evita cualquier fila duplicada si los rangos de fecha se cruzaron)
-        df_maestro = df_completo.groupby(['SubmitDate', 'CompanyName', 'CountryRealName', 'OperatorName', 'DLRStatus']).agg({
-            'MessageParts': 'sum', 'ClientCostUSD': 'sum', 'TerminationCostUSD': 'sum', 'DLRDelay': 'mean'
-        }).reset_index()
+        # Agrupación final maestra (Garantiza integridad)
+        df_maestro = df_completo.groupby(DIMENSIONES).agg(METRICAS).reset_index()
         
         df_maestro.to_excel(RUTA_EXCEL, index=False)
-        print(f"🏆 ¡PROCESO EXITOSO! Base de datos comprimida a {len(df_maestro)} filas.")
+        print(f"🏆 ¡PROCESO EXITOSO! Base de datos saneada y comprimida a {len(df_maestro)} filas.")
