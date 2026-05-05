@@ -66,17 +66,28 @@ def update():
             print("⚪ No hubo tráfico ayer.")
             return
 
-        # 1. Conversión de moneda
-        c_cur = 'CurrencyCode' if 'CurrencyCode' in df.columns else 'ClientCurrency'
-        v_cur = 'TerminationCurrencyCode' if 'TerminationCurrencyCode' in df.columns else 'VendorCurrency'
+        # 1. 🎯 Renombramos para no perder la moneda original
+        renombramientos = {
+            'Operator': 'OperatorName',
+            'ClientCurrency': 'CurrencyCode',
+            'VendorCurrency': 'TerminationCurrencyCode',
+            'TerminationCurrency': 'TerminationCurrencyCode'
+        }
+        df = df.rename(columns=renombramientos)
+        
+        if 'CurrencyCode' not in df.columns: df['CurrencyCode'] = 'USD'
+        if 'TerminationCurrencyCode' not in df.columns: df['TerminationCurrencyCode'] = 'USD'
+        df['CurrencyCode'] = df['CurrencyCode'].fillna('USD')
+        df['TerminationCurrencyCode'] = df['TerminationCurrencyCode'].fillna('USD')
         
         def aplicar_conversion(row):
-            t_client = obtener_tasa_diaria(ayer_str, row.get(c_cur, 'USD'))
-            t_vendor = obtener_tasa_diaria(ayer_str, row.get(v_cur, 'USD'))
-            return pd.Series([row['ClientCost'] * t_client, row['TerminationCost'] * t_vendor])
+            t_client = obtener_tasa_diaria(ayer_str, row['CurrencyCode'])
+            t_vendor = obtener_tasa_diaria(ayer_str, row['TerminationCurrencyCode'])
+            return pd.Series([row.get('ClientCost', 0) * t_client, row.get('TerminationCost', 0) * t_vendor])
 
         df[['ClientCostUSD', 'TerminationCostUSD']] = df.apply(aplicar_conversion, axis=1)
         df['SubmitDate'] = pd.to_datetime(df['SubmitDate']).dt.date
+        # --- (Luego de esto sigue el código forzando las dimensiones con for col in DIMENSIONES...) ---
         
         # 2. 🛡️ FORZAR COLUMNAS PARA PARIDAD
         for col in DIMENSIONES:
