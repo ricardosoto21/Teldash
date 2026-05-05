@@ -187,65 +187,50 @@
 
             document.getElementById('loading').style.display = 'none';
 
-            // 🥷 FUNCIÓN NINJA: Ignora mayúsculas, minúsculas, espacios y tildes en los encabezados
-            function leerColumna(fila, nombresPosibles) {
-                const keys = Object.keys(fila);
-                for (let nombre of nombresPosibles) {
-                    const target = nombre.toLowerCase().replace(/\s/g, '').replace('í','i');
-                    const match = keys.find(k => k.toLowerCase().replace(/\s/g, '').replace('í','i') === target);
-                    if (match && fila[match] !== undefined && fila[match] !== "") {
-                        return fila[match];
-                    }
-                }
-                return null;
-            }
-            
-            // 🎯 MAPEO BLINDADO PARA COSTOS (PROVEEDORES)
+          document.getElementById('loading').style.display = 'none';
+
+            // 🎯 MAPEO DIRECTO Y EXACTO PARA COSTOS (PROVEEDORES)
             dualData.costos.forEach(row => {
-                const p = leerColumna(row, ['Pais', 'Country']) || "Desconocido";
-                const prov = leerColumna(row, ['Cliente(oProveedor)', 'Proveedor', 'Vendor']) || 'Genérico';
+                // Buscamos literalmente "País" con tilde, o sin tilde por si acaso
+                const p = row['País'] || row['Pais'] || row['Country'] || "Desconocido";
+                const prov = row['Proveedor'] || row['Cliente(o Proveedor)'] || 'Genérico';
                 
                 if (!globalData[p]) globalData[p] = { nombre: p, proveedores: new Set(), rutas: [] };
                 globalData[p].proveedores.add(prov);
                 
                 globalData[p].rutas.push({
                     Proveedor: prov,
-                    Ruta: leerColumna(row, ['Ruta', 'Route']) || '--',
-                    MCC: leerColumna(row, ['MCC']) || '0',
-                    MNC: leerColumna(row, ['MNC']) || '0',
-                    Operador: leerColumna(row, ['Operador', 'Operator']) || 'Todos',
-                    Tarifa: leerColumna(row, ['Tarifa', 'Rate', 'Precio', 'Price']) || 0,
-                    Moneda: leerColumna(row, ['Moneda', 'Currency']) || 'USD'
+                    Ruta: row['Ruta'] || '--',
+                    MCC: row['MCC'] || '0',
+                    MNC: row['MNC'] || '0',
+                    Operador: row['Operador'] || 'Todos',
+                    Tarifa: row['Tarifa'] || 0,
+                    Moneda: row['Moneda'] || 'USD'
                 });
                 allProviders.add(prov);
             });
 
-            // 🎯 MAPEO BLINDADO PARA VENTAS (CLIENTES)
+            // 🎯 MAPEO DIRECTO Y EXACTO PARA VENTAS (CLIENTES)
             dualData.ventas.forEach(row => {
-                const p = leerColumna(row, ['Pais', 'Country']) || "Desconocido";
-                const cli = leerColumna(row, ['Cliente(oProveedor)', 'Cliente', 'Account']) || 'Genérico';
+                const p = row['País'] || row['Pais'] || row['Country'] || "Desconocido";
+                const cli = row['Cliente'] || row['Proveedor'] || row['Cliente(o Proveedor)'] || 'Genérico';
                 
                 if (!globalSalesData[p]) globalSalesData[p] = { rutas: [] };
                 
                 globalSalesData[p].rutas.push({
                     Cliente: cli,
-                    Ruta: leerColumna(row, ['Ruta', 'Route']) || '--',
-                    MCC: leerColumna(row, ['MCC']) || '0',
-                    MNC: leerColumna(row, ['MNC']) || '0',
-                    Operador: leerColumna(row, ['Operador', 'Operator']) || 'Todos',
-                    Tarifa: leerColumna(row, ['Tarifa', 'Rate', 'Precio', 'Price']) || 0,
-                    Moneda: leerColumna(row, ['Moneda', 'Currency']) || 'USD'
+                    Ruta: row['Ruta'] || '--',
+                    MCC: row['MCC'] || '0',
+                    MNC: row['MNC'] || '0',
+                    Operador: row['Operador'] || 'Todos',
+                    Tarifa: row['Tarifa'] || 0,
+                    Moneda: row['Moneda'] || 'USD'
                 });
             });
 
             renderizarTarjetas();
             llenarFiltroProveedores();
-        });
-
-        $('#searchCountry').on('keyup', filtrarTarjetas);
-        $('#filterProvider').on('change', filtrarTarjetas);
-    });
-
+            
     function formatDualCurrency(amount, currency) {
         amount = parseFloat(amount) || 0;
         currency = (currency || 'USD').toString().trim().toUpperCase();
