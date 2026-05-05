@@ -63,6 +63,9 @@
     <div class="row" id="cardsContainer"></div>
 </div>
 
+<!-- ========================================== -->
+<!-- MODAL 1: COSTOS PROVEEDORES (COMPRAS) -->
+<!-- ========================================== -->
 <div class="modal fade" id="provModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content">
@@ -85,6 +88,9 @@
     </div>
 </div>
 
+<!-- ========================================== -->
+<!-- MODAL 2: PRECIOS DE VENTA (CLIENTES) -->
+<!-- ========================================== -->
 <div class="modal fade" id="saleModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content">
@@ -107,6 +113,9 @@
     </div>
 </div>
 
+<!-- ========================================== -->
+<!-- MODAL 3: TRÁFICO LIVE -->
+<!-- ========================================== -->
 <div id="liveModal" class="live-modal">
     <div class="live-modal-content">
         <span class="close-live" onclick="closeLive()">&times;</span>
@@ -129,7 +138,7 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
 <script>
-    const API_URL = "https://script.google.com/macros/s/AKfycbx8KKCix_3qaiYWz0Tysjt5VzBipG-b4bBoyt6792vZuv2Ct9es9JnnGSss7nTUV4oL/exec"; 
+    const API_URL = "https://script.google.com/macros/s/AKfycbxAs45hYUlPGmCyY4FijgoEa6ZfogMh3WOqQHUvc3FOUt_mhNtLaywoAZdibGVq7gob/exec"; 
     
     let globalData = {};      
     let globalSalesData = {}; 
@@ -143,7 +152,6 @@
     let paisActualVentas = "";
     let vistaDetalladaVentas = false;
 
-    // Lógica de Moneda Dual
     let tasaEUR_USD = 1.08; 
     let tasaUSD_EUR = 1 / 1.08;
 
@@ -178,21 +186,56 @@
             }
 
             document.getElementById('loading').style.display = 'none';
+
+            // 🥷 FUNCIÓN NINJA: Ignora mayúsculas, minúsculas, espacios y tildes en los encabezados
+            function leerColumna(fila, nombresPosibles) {
+                const keys = Object.keys(fila);
+                for (let nombre of nombresPosibles) {
+                    const target = nombre.toLowerCase().replace(/\s/g, '').replace('í','i');
+                    const match = keys.find(k => k.toLowerCase().replace(/\s/g, '').replace('í','i') === target);
+                    if (match && fila[match] !== undefined && fila[match] !== "") {
+                        return fila[match];
+                    }
+                }
+                return null;
+            }
             
-            // 🎯 MAPEO EXACTO PARA COSTOS (PROVEEDORES)
+            // 🎯 MAPEO BLINDADO PARA COSTOS (PROVEEDORES)
             dualData.costos.forEach(row => {
-                const p = row.Pais || "Desconocido";
+                const p = leerColumna(row, ['Pais', 'Country']) || "Desconocido";
+                const prov = leerColumna(row, ['Cliente(oProveedor)', 'Proveedor', 'Vendor']) || 'Genérico';
+                
                 if (!globalData[p]) globalData[p] = { nombre: p, proveedores: new Set(), rutas: [] };
-                globalData[p].proveedores.add(row.Proveedor || 'Genérico');
-                globalData[p].rutas.push(row);
-                allProviders.add(row.Proveedor || 'Genérico');
+                globalData[p].proveedores.add(prov);
+                
+                globalData[p].rutas.push({
+                    Proveedor: prov,
+                    Ruta: leerColumna(row, ['Ruta', 'Route']) || '--',
+                    MCC: leerColumna(row, ['MCC']) || '0',
+                    MNC: leerColumna(row, ['MNC']) || '0',
+                    Operador: leerColumna(row, ['Operador', 'Operator']) || 'Todos',
+                    Tarifa: leerColumna(row, ['Tarifa', 'Rate', 'Precio', 'Price']) || 0,
+                    Moneda: leerColumna(row, ['Moneda', 'Currency']) || 'USD'
+                });
+                allProviders.add(prov);
             });
 
-            // 🎯 MAPEO EXACTO PARA VENTAS (CLIENTES)
+            // 🎯 MAPEO BLINDADO PARA VENTAS (CLIENTES)
             dualData.ventas.forEach(row => {
-                const p = row.Pais || "Desconocido";
+                const p = leerColumna(row, ['Pais', 'Country']) || "Desconocido";
+                const cli = leerColumna(row, ['Cliente(oProveedor)', 'Cliente', 'Account']) || 'Genérico';
+                
                 if (!globalSalesData[p]) globalSalesData[p] = { rutas: [] };
-                globalSalesData[p].rutas.push(row);
+                
+                globalSalesData[p].rutas.push({
+                    Cliente: cli,
+                    Ruta: leerColumna(row, ['Ruta', 'Route']) || '--',
+                    MCC: leerColumna(row, ['MCC']) || '0',
+                    MNC: leerColumna(row, ['MNC']) || '0',
+                    Operador: leerColumna(row, ['Operador', 'Operator']) || 'Todos',
+                    Tarifa: leerColumna(row, ['Tarifa', 'Rate', 'Precio', 'Price']) || 0,
+                    Moneda: leerColumna(row, ['Moneda', 'Currency']) || 'USD'
+                });
             });
 
             renderizarTarjetas();
@@ -203,7 +246,6 @@
         $('#filterProvider').on('change', filtrarTarjetas);
     });
 
-    // --- FUNCIÓN DE MONEDA DUAL ---
     function formatDualCurrency(amount, currency) {
         amount = parseFloat(amount) || 0;
         currency = (currency || 'USD').toString().trim().toUpperCase();
@@ -217,7 +259,7 @@
         }
     }
 
-    // --- LÓGICA MODAL PROVEEDORES (COMPRAS) ---
+    // --- LÓGICA MODAL PROVEEDORES ---
     function abrirProv(nombre) {
         paisActual = nombre;
         vistaDetallada = false;
@@ -269,7 +311,7 @@
         $('#modalProvName').text(`Costos Proveedores: ${paisActual}`);
     }
 
-    // --- LÓGICA MODAL VENTAS (CLIENTES) ---
+    // --- LÓGICA MODAL VENTAS ---
     function abrirVentas(nombre) {
         paisActualVentas = nombre;
         vistaDetalladaVentas = false;
@@ -327,7 +369,7 @@
         $('#modalSaleName').text(`Precios de Venta: ${paisActualVentas}`);
     }
 
-    // --- FUNCIONES COMPARTIDAS ---
+    // --- TARJETAS Y FILTROS ---
     function renderizarTarjetas() {
         const container = $('#cardsContainer');
         container.empty();
