@@ -155,81 +155,114 @@
     let tasaEUR_USD = 1.08; 
     let tasaUSD_EUR = 1 / 1.08;
 
-    $(document).ready(function() {
+$(document).ready(function() {
         Promise.all([
-            fetch('https://restcountries.com/v3.1/all?fields=name,cca2').then(r => r.json()),
-            fetch(API_URL).then(r => r.json()).catch(() => null),
-            fetch(`datos/live_traffic.xlsx?t=${new Date().getTime()}`).then(r => r.arrayBuffer()).catch(() => null),
-            fetch('https://open.er-api.com/v6/latest/EUR').then(r => r.json()).catch(() => ({rates:{USD:1.08}}))
+            // Protegemos la API de banderas
+            fetch('https://restcountries.com/v3.1/all?fields=name,cca2').then(r => r.ok ? r.json() : []).catch(() => []),
+            
+            // API Principal de Google
+            fetch(API_URL).then(r => r.json()).catch(e => null),
+            
+            // Protegemos el archivo Live Traffic por si no existe en GitHub Pages aún (Evita error de lectura)
+            fetch(`datos/live_traffic.xlsx?t=${new Date().getTime()}`).then(r => r.ok ? r.arrayBuffer() : null).catch(() => null),
+            
+            // API de divisas
+            fetch('https://open.er-api.com/v6/latest/EUR').then(r => r.ok ? r.json() : null).catch(() => null)
         ])
         .then(([paisesMundo, dualData, bufferLive, fxData]) => {
-            
-            if(fxData?.rates?.USD) {
-                tasaEUR_USD = fxData.rates.USD;
-                tasaUSD_EUR = 1 / tasaEUR_USD;
-            }
+            try {
+                // 1. Tasa de cambio
+                if(fxData && fxData.rates && fxData.rates.USD) {
+                    tasaEUR_USD = fxData.rates.USD;
+                    tasaUSD_EUR = 1 / tasaEUR_USD;
+                }
 
-            if (!dualData || !dualData.costos || !dualData.ventas) {
-                document.getElementById('loading').innerHTML = `<div class="alert alert-danger mx-auto text-center shadow">🚨 ERROR DE FORMATO EN GOOGLE SHEETS</div>`;
-                return; 
-            }
+                // 2. Verificación de Google Sheets
+                if (!dualData || !dualData.costos || !dualData.ventas) {
+                    document.getElementById('loading').innerHTML = `<div class="alert alert-danger mx-auto text-center shadow">🚨 ERROR DE FORMATO O CONEXIÓN CON GOOGLE SHEETS</div>`;
+                    return; 
+                }
 
-            paisesMundo.forEach(p => { banderasISO[p.name.common.toLowerCase()] = p.cca2.toLowerCase(); });
-            banderasISO["usa"] = "us"; banderasISO["uk"] = "gb";
+                // 3. Mapeo de banderas
+                if (Array.isArray(paisesMundo)) {
+                    paisesMundo.forEach(p => { 
+                        if(p.name && p.name.common && p.cca2) banderasISO[p.name.common.toLowerCase()] = p.cca2.toLowerCase(); 
+                    });
+                }
+                banderasISO["usa"] = "us"; banderasISO["uk"] = "gb";
 
-            if (bufferLive) {
-                const wb = XLSX.read(bufferLive, { type: 'array' });
-                const liveData = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
-                liveData.forEach(row => {
-                    if (row.CountryRealName) trafficVolumes[row.CountryRealName] = (trafficVolumes[row.CountryRealName] || 0) + 1;
+                // 4. Mapeo Live Traffic (Protegido contra Excel corruptos o 404)
+                if (bufferLive) {
+                    try {
+                        const wb = XLSX.read(bufferLive, { type: 'array' });
+                        const liveData = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
+                        liveData.forEach(row => {
+                            if (row.CountryRealName) trafficVolumes[row.CountryRealName] = (trafficVolumes[row.CountryRealName] || 0) + 1;
+                        });
+                    } catch (errLive) {
+                        console.warn("⚠️ No se pudo procesar el tráfico en vivo (puede estar vacío o corrupto).", errLive);
+                    }
+                }
+
+                // 5. 🎯 MAPEO EXACTO PARA COSTOS (PROVEEDORES)
+                dualData.costos.forEach(row => {
+                    const p = row['País'] || row['Pais'] || row['Country'] || "Desconocido";
+                    const prov = row['Proveedor'] || row['Cliente(o Proveedor)'] || 'Genérico';
+                    
+                    if (!globalData[p]) globalData[p] = { nombre: p, proveedores: new Set(), rutas: [] };
+                    globalData[p].proveedores.add(prov);
+                    
+                    globalData[p].rutas.push({
+                        Proveedor: prov,
+                        Ruta: row['Ruta'] || '--',
+                        MCC: row['MCC'] || '0',
+                        MNC: row['MNC'] || '0',
+                        Operador: row['Operador'] || 'Todos',
+                        Tarifa: row['Tarifa'] || 0,
+                        Moneda: row['Moneda'] || 'USD'
+                    });
+                    allProviders.add(prov);
                 });
+
+                // 6. 🎯 MAPEO EXACTO PARA VENTAS (CLIENTES)
+                dualData.ventas.forEach(row => {
+                    const p = row['País'] || row['Pais'] || row['Country'] || "Desconocido";
+                    const cli = row['Cliente'] || row['Proveedor'] || row['Cliente(o Proveedor)'] || 'Genérico';
+                    
+                    if (!globalSalesData[p]) globalSalesData[p] = { rutas: [] };
+                    
+                    globalSalesData[p].rutas.push({
+                        Cliente: cli,
+                        Ruta: row['Ruta'] || '--',
+                        MCC: row['MCC'] || '0',
+                        MNC: row['MNC'] || '0',
+                        Operador: row['Operador'] || 'Todos',
+                        Tarifa: row['Tarifa'] || 0,
+                        Moneda: row['Moneda'] || 'USD'
+                    });
+                });
+
+                // 7. Renderizar y ocultar carga
+                document.getElementById('loading').style.display = 'none';
+                renderizarTarjetas();
+                llenarFiltroProveedores();
+
+            } catch (errorFantasma) {
+                // Si algo se rompe dentro, lo mostramos en pantalla gigante
+                console.error("Error interno:", errorFantasma);
+                document.getElementById('loading').innerHTML = `<div class="alert alert-danger mx-auto text-center shadow">🚨 ERROR INTERNO DE CÓDIGO: <br> ${errorFantasma.message}</div>`;
             }
+        })
+        .catch(errGrave => {
+            // Si el internet o las promesas fallan brutalmente
+            console.error("Fallo general:", errGrave);
+            document.getElementById('loading').innerHTML = `<div class="alert alert-danger mx-auto text-center shadow">🚨 ERROR DE RED: No se pudieron descargar los datos.</div>`;
+        });
 
-            document.getElementById('loading').style.display = 'none';
-
-          document.getElementById('loading').style.display = 'none';
-
-            // 🎯 MAPEO DIRECTO Y EXACTO PARA COSTOS (PROVEEDORES)
-            dualData.costos.forEach(row => {
-                // Buscamos literalmente "País" con tilde, o sin tilde por si acaso
-                const p = row['País'] || row['Pais'] || row['Country'] || "Desconocido";
-                const prov = row['Proveedor'] || row['Cliente(o Proveedor)'] || 'Genérico';
-                
-                if (!globalData[p]) globalData[p] = { nombre: p, proveedores: new Set(), rutas: [] };
-                globalData[p].proveedores.add(prov);
-                
-                globalData[p].rutas.push({
-                    Proveedor: prov,
-                    Ruta: row['Ruta'] || '--',
-                    MCC: row['MCC'] || '0',
-                    MNC: row['MNC'] || '0',
-                    Operador: row['Operador'] || 'Todos',
-                    Tarifa: row['Tarifa'] || 0,
-                    Moneda: row['Moneda'] || 'USD'
-                });
-                allProviders.add(prov);
-            });
-
-            // 🎯 MAPEO DIRECTO Y EXACTO PARA VENTAS (CLIENTES)
-            dualData.ventas.forEach(row => {
-                const p = row['País'] || row['Pais'] || row['Country'] || "Desconocido";
-                const cli = row['Cliente'] || row['Proveedor'] || row['Cliente(o Proveedor)'] || 'Genérico';
-                
-                if (!globalSalesData[p]) globalSalesData[p] = { rutas: [] };
-                
-                globalSalesData[p].rutas.push({
-                    Cliente: cli,
-                    Ruta: row['Ruta'] || '--',
-                    MCC: row['MCC'] || '0',
-                    MNC: row['MNC'] || '0',
-                    Operador: row['Operador'] || 'Todos',
-                    Tarifa: row['Tarifa'] || 0,
-                    Moneda: row['Moneda'] || 'USD'
-                });
-            });
-
-            renderizarTarjetas();
-            llenarFiltroProveedores();
+        // Eventos de búsqueda
+        $('#searchCountry').on('keyup', filtrarTarjetas);
+        $('#filterProvider').on('change', filtrarTarjetas);
+    });
             
     function formatDualCurrency(amount, currency) {
         amount = parseFloat(amount) || 0;
