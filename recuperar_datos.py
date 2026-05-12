@@ -73,7 +73,11 @@ def recuperar():
             if df.empty:
                 print(f"⚪ Sin tráfico para el {dia}")
                 continue
-            
+       else:
+            print(f"❌ Error descargando datos del {dia}. El archivo no es Excel válido.")
+            print(f"🔍 ESTO FUE LO QUE RESPONDIÓ EL SERVIDOR:\n{r.text[:300]}") # Muestra los primeros 300 caracteres
+
+           
             # 1. 🎯 Renombramos para no perder la moneda original
             renombramientos = {
                 'Operator': 'OperatorName',
