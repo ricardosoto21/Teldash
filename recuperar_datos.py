@@ -7,7 +7,7 @@ USUARIO = os.environ.get('SMS_USER')
 CLAVE = os.environ.get('SMS_PASS')
 RUTA_EXCEL = 'datos/reporte_actual.xlsx'
 
-# 🎯 DÍAS A RECUPERAR (Corregidos los errores de tipeo)
+# 🎯 DÍAS A RECUPERAR
 DIAS_FALTANTES = ['2026-05-07', '2026-05-08', '2026-05-09', '2026-05-10', '2026-05-11']
 
 # 🚨 LISTA OFICIAL DE DIMENSIONES (Garantiza paridad exacta)
@@ -73,11 +73,7 @@ def recuperar():
             if df.empty:
                 print(f"⚪ Sin tráfico para el {dia}")
                 continue
-       else:
-            print(f"❌ Error descargando datos del {dia}. El archivo no es Excel válido.")
-            print(f"🔍 ESTO FUE LO QUE RESPONDIÓ EL SERVIDOR:\n{r.text[:300]}") # Muestra los primeros 300 caracteres
-
-           
+            
             # 1. 🎯 Renombramos para no perder la moneda original
             renombramientos = {
                 'Operator': 'OperatorName',
@@ -92,7 +88,6 @@ def recuperar():
             df['CurrencyCode'] = df['CurrencyCode'].fillna('USD')
             df['TerminationCurrencyCode'] = df['TerminationCurrencyCode'].fillna('USD')
             
-            # 🚨 FIX APLICADO: Usamos 'dia' en lugar de 'ayer_str'
             def aplicar_conversion(row):
                 t_client = obtener_tasa_diaria(dia, row['CurrencyCode'])
                 t_vendor = obtener_tasa_diaria(dia, row['TerminationCurrencyCode'])
@@ -113,6 +108,7 @@ def recuperar():
             print(f"✅ {dia} procesado: {len(resumen)} grupos generados.")
         else:
             print(f"❌ Error descargando datos del {dia}. El archivo no es Excel válido.")
+            print(f"🔍 ESTO FUE LO QUE RESPONDIÓ EL SERVIDOR:\n{r.text[:300]}")
     
     if nuevos_datos:
         print("⚙️ Uniendo los datos recuperados al archivo principal...")
