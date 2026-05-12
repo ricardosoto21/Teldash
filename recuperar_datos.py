@@ -7,10 +7,10 @@ USUARIO = os.environ.get('SMS_USER')
 CLAVE = os.environ.get('SMS_PASS')
 RUTA_EXCEL = 'datos/reporte_actual.xlsx'
 
-# 🎯 DÍAS A RECUPERAR
-DIAS_FALTANTES = ['2026-03-24', '2026-03-25']
+# 🎯 DÍAS A RECUPERAR (Corregidos los errores de tipeo)
+DIAS_FALTANTES = ['2026-05-07', '2026-05-08', '2026-05-09', '2026-05-10', '2026-05-11']
 
-# 🚨 LISTA OFICIAL DE DIMENSIONES (Garantiza paridad exacta con update_data.py)
+# 🚨 LISTA OFICIAL DE DIMENSIONES (Garantiza paridad exacta)
 DIMENSIONES = [
     'SubmitDate', 'CompanyName', 'SMPPAccountName', 'SMPPUsername', 'MCC', 'MNC', 
     'OperatorName', 'DLRStatus', 'ErrorDescription', 'VendorAccountName', 'SenderID', 
@@ -74,28 +74,28 @@ def recuperar():
                 print(f"⚪ Sin tráfico para el {dia}")
                 continue
             
-           # 1. 🎯 Renombramos para no perder la moneda original
-        renombramientos = {
-            'Operator': 'OperatorName',
-            'ClientCurrency': 'CurrencyCode',
-            'VendorCurrency': 'TerminationCurrencyCode',
-            'TerminationCurrency': 'TerminationCurrencyCode'
-        }
-        df = df.rename(columns=renombramientos)
-        
-        if 'CurrencyCode' not in df.columns: df['CurrencyCode'] = 'USD'
-        if 'TerminationCurrencyCode' not in df.columns: df['TerminationCurrencyCode'] = 'USD'
-        df['CurrencyCode'] = df['CurrencyCode'].fillna('USD')
-        df['TerminationCurrencyCode'] = df['TerminationCurrencyCode'].fillna('USD')
-        
-        def aplicar_conversion(row):
-            t_client = obtener_tasa_diaria(ayer_str, row['CurrencyCode'])
-            t_vendor = obtener_tasa_diaria(ayer_str, row['TerminationCurrencyCode'])
-            return pd.Series([row.get('ClientCost', 0) * t_client, row.get('TerminationCost', 0) * t_vendor])
+            # 1. 🎯 Renombramos para no perder la moneda original
+            renombramientos = {
+                'Operator': 'OperatorName',
+                'ClientCurrency': 'CurrencyCode',
+                'VendorCurrency': 'TerminationCurrencyCode',
+                'TerminationCurrency': 'TerminationCurrencyCode'
+            }
+            df = df.rename(columns=renombramientos)
+            
+            if 'CurrencyCode' not in df.columns: df['CurrencyCode'] = 'USD'
+            if 'TerminationCurrencyCode' not in df.columns: df['TerminationCurrencyCode'] = 'USD'
+            df['CurrencyCode'] = df['CurrencyCode'].fillna('USD')
+            df['TerminationCurrencyCode'] = df['TerminationCurrencyCode'].fillna('USD')
+            
+            # 🚨 FIX APLICADO: Usamos 'dia' en lugar de 'ayer_str'
+            def aplicar_conversion(row):
+                t_client = obtener_tasa_diaria(dia, row['CurrencyCode'])
+                t_vendor = obtener_tasa_diaria(dia, row['TerminationCurrencyCode'])
+                return pd.Series([row.get('ClientCost', 0) * t_client, row.get('TerminationCost', 0) * t_vendor])
 
-        df[['ClientCostUSD', 'TerminationCostUSD']] = df.apply(aplicar_conversion, axis=1)
-        df['SubmitDate'] = pd.to_datetime(df['SubmitDate']).dt.date
-        # --- (Luego de esto sigue el código forzando las dimensiones con for col in DIMENSIONES...) ---
+            df[['ClientCostUSD', 'TerminationCostUSD']] = df.apply(aplicar_conversion, axis=1)
+            df['SubmitDate'] = pd.to_datetime(df['SubmitDate']).dt.date
             
             # 2. 🛡️ FORZAR COLUMNAS PARA PARIDAD EXACTA
             for col in DIMENSIONES:
@@ -107,6 +107,8 @@ def recuperar():
             resumen = df.groupby(DIMENSIONES).agg(METRICAS).reset_index()
             nuevos_datos.append(resumen)
             print(f"✅ {dia} procesado: {len(resumen)} grupos generados.")
+        else:
+            print(f"❌ Error descargando datos del {dia}. El archivo no es Excel válido.")
     
     if nuevos_datos:
         print("⚙️ Uniendo los datos recuperados al archivo principal...")
