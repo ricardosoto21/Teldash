@@ -10,7 +10,7 @@ RUTA_EXCEL = 'datos/reporte_actual.xlsx'
 # 🎯 DÍAS A RECUPERAR
 DIAS_FALTANTES = ['2026-05-07', '2026-05-08', '2026-05-09', '2026-05-10', '2026-05-11']
 
-# 🚨 LISTA OFICIAL DE DIMENSIONES (Garantiza paridad exacta)
+# 🚨 LISTA OFICIAL DE DIMENSIONES
 DIMENSIONES = [
     'SubmitDate', 'CompanyName', 'SMPPAccountName', 'SMPPUsername', 'MCC', 'MNC', 
     'OperatorName', 'DLRStatus', 'ErrorDescription', 'VendorAccountName', 'SenderID', 
@@ -24,6 +24,8 @@ METRICAS = {
 }
 
 session = requests.Session()
+# 🛡️ LA MÁSCARA MÁGICA: Engaña al servidor haciéndose pasar por Google Chrome
+session.headers.update({'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'})
 cache_tasas = {}
 
 def obtener_tasa_diaria(fecha_str, moneda):
@@ -47,10 +49,12 @@ def obtener_tasa_diaria(fecha_str, moneda):
         return {'EUR': 1.08, 'CLP': 0.0011}.get(moneda, 1.0)
 
 def login():
+    print(f"🔑 Intentando login en el servidor...")
     r = session.get('http://65.108.69.39:5660/')
     token = BeautifulSoup(r.text, 'html.parser').find('input', {'name': '__RequestVerificationToken'})['value']
     payload = {'Username': USUARIO, 'UserKey': CLAVE, 'RememberMe': 'true', '__RequestVerificationToken': token}
-    session.post('http://65.108.69.39:5660/Home/CheckLogin', data=payload, headers={'RequestVerificationToken': token, 'X-Requested-With': 'XMLHttpRequest'})
+    res = session.post('http://65.108.69.39:5660/Home/CheckLogin', data=payload, headers={'RequestVerificationToken': token, 'X-Requested-With': 'XMLHttpRequest'})
+    print("✅ Login enviado con éxito.")
 
 def recuperar():
     login()
@@ -108,7 +112,7 @@ def recuperar():
             print(f"✅ {dia} procesado: {len(resumen)} grupos generados.")
         else:
             print(f"❌ Error descargando datos del {dia}. El archivo no es Excel válido.")
-            print(f"🔍 ESTO FUE LO QUE RESPONDIÓ EL SERVIDOR:\n{r.text[:300]}")
+            print(f"🔍 ESTO FUE LO QUE RESPONDIÓ EL SERVIDOR:\n{r.text[:150]}")
     
     if nuevos_datos:
         print("⚙️ Uniendo los datos recuperados al archivo principal...")
