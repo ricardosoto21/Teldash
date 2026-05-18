@@ -124,7 +124,7 @@
             <table id="live-table" class="table table-dark table-hover">
                 <thead>
                     <tr>
-                        <th>Hora</th><th>Número</th><th>Operador</th><th>Cliente</th><th>Ruta</th><th>Vendor</th><th>Status</th><th>Delay</th>
+                        <th>Hora</th><th>Número</th><th>Operador</th><th>Cliente</th><th>Ruta</th><th>Vendor</th><th>Status</th><th>Delay</th><th>Mensaje</th>
                     </tr>
                 </thead>
                 <tbody></tbody>
@@ -155,6 +155,74 @@
     let tasaEUR_USD = 1.08; 
     let tasaUSD_EUR = 1 / 1.08;
 
+    function pickField(row, fields, fallback = '') {
+        for (const field of fields) {
+            const value = row?.[field];
+            if (value !== undefined && value !== null && String(value).trim() !== '') {
+                return String(value).trim();
+            }
+        }
+        return fallback;
+    }
+
+    function normalizeRate(value) {
+        const rate = parseFloat(String(value ?? 0).replace(',', '.').trim());
+        return Number.isFinite(rate) ? rate : 0;
+    }
+
+    function normalizeDualData(payload) {
+        if (!payload) return { costos: [], ventas: [] };
+
+        if (Array.isArray(payload)) {
+            return { costos: payload, ventas: [] };
+        }
+
+        return {
+            costos: Array.isArray(payload.costos) ? payload.costos : [],
+            ventas: Array.isArray(payload.ventas) ? payload.ventas : []
+        };
+    }
+
+    function mapCostRow(row) {
+        return {
+            pais: pickField(row, ['País', 'Pais', 'Country', 'pais', 'country', 'CountryRealName'], 'Desconocido'),
+            proveedor: pickField(row, ['Proveedor', 'proveedor', 'Cliente(o Proveedor)', 'Vendor', 'vendor'], 'Generico'),
+            ruta: pickField(row, ['Ruta', 'ruta'], '--'),
+            mcc: pickField(row, ['MCC', 'mcc'], '0'),
+            mnc: pickField(row, ['MNC', 'mnc'], '0'),
+            operador: pickField(row, ['Operador', 'operador', 'Operator', 'OperatorName'], 'Todos'),
+            tarifa: normalizeRate(pickField(row, ['Tarifa', 'tarifa', 'Rate', 'rate'], 0)),
+            moneda: pickField(row, ['Moneda', 'moneda', 'Currency', 'currency'], 'USD')
+        };
+    }
+
+    function mapSaleRow(row) {
+        return {
+            pais: pickField(row, ['País', 'Pais', 'Country', 'pais', 'country', 'CountryRealName'], 'Desconocido'),
+            cliente: pickField(row, ['Cliente', 'cliente', 'CompanyName', 'Proveedor', 'proveedor', 'Cliente(o Proveedor)'], 'Generico'),
+            ruta: pickField(row, ['Ruta', 'ruta'], '--'),
+            mcc: pickField(row, ['MCC', 'mcc'], '0'),
+            mnc: pickField(row, ['MNC', 'mnc'], '0'),
+            operador: pickField(row, ['Operador', 'operador', 'Operator', 'OperatorName'], 'Todos'),
+            tarifa: normalizeRate(pickField(row, ['Tarifa', 'tarifa', 'Rate', 'rate'], 0)),
+            moneda: pickField(row, ['Moneda', 'moneda', 'Currency', 'currency'], 'USD')
+        };
+    }
+
+    function escapeHtml(value) {
+        return String(value ?? '').replace(/[&<>"']/g, char => ({
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#39;'
+        }[char]));
+    }
+
+    function escapeAttr(value) {
+        return escapeHtml(value).replace(/`/g, '&#96;');
+    }
+
 $(document).ready(function() {
         Promise.all([
             // Protegemos la API de banderas
@@ -177,8 +245,10 @@ $(document).ready(function() {
                     tasaUSD_EUR = 1 / tasaEUR_USD;
                 }
 
+                const normalizedData = normalizeDualData(dualData);
+
                 // 2. Verificación de Google Sheets
-                if (!dualData || !dualData.costos || !dualData.ventas) {
+                if (!normalizedData.costos.length && !normalizedData.ventas.length) {
                     document.getElementById('loading').innerHTML = `<div class="alert alert-danger mx-auto text-center shadow">🚨 ERROR DE FORMATO O CONEXIÓN CON GOOGLE SHEETS</div>`;
                     return; 
                 }
@@ -205,40 +275,42 @@ $(document).ready(function() {
                 }
 
                 // 5. 🎯 MAPEO EXACTO PARA COSTOS (PROVEEDORES)
-                dualData.costos.forEach(row => {
-                    const p = row['País'] || row['Pais'] || row['Country'] || "Desconocido";
-                    const prov = row['Proveedor'] || row['Cliente(o Proveedor)'] || 'Genérico';
+                normalizedData.costos.forEach(row => {
+                    const item = mapCostRow(row);
+                    const p = item.pais;
+                    const prov = item.proveedor;
                     
                     if (!globalData[p]) globalData[p] = { nombre: p, proveedores: new Set(), rutas: [] };
                     globalData[p].proveedores.add(prov);
                     
                     globalData[p].rutas.push({
                         Proveedor: prov,
-                        Ruta: row['Ruta'] || '--',
-                        MCC: row['MCC'] || '0',
-                        MNC: row['MNC'] || '0',
-                        Operador: row['Operador'] || 'Todos',
-                        Tarifa: row['Tarifa'] || 0,
-                        Moneda: row['Moneda'] || 'USD'
+                        Ruta: item.ruta,
+                        MCC: item.mcc,
+                        MNC: item.mnc,
+                        Operador: item.operador,
+                        Tarifa: item.tarifa,
+                        Moneda: item.moneda
                     });
                     allProviders.add(prov);
                 });
 
                 // 6. 🎯 MAPEO EXACTO PARA VENTAS (CLIENTES)
-                dualData.ventas.forEach(row => {
-                    const p = row['País'] || row['Pais'] || row['Country'] || "Desconocido";
-                    const cli = row['Cliente'] || row['Proveedor'] || row['Cliente(o Proveedor)'] || 'Genérico';
+                normalizedData.ventas.forEach(row => {
+                    const item = mapSaleRow(row);
+                    const p = item.pais;
+                    const cli = item.cliente;
                     
                     if (!globalSalesData[p]) globalSalesData[p] = { rutas: [] };
                     
                     globalSalesData[p].rutas.push({
                         Cliente: cli,
-                        Ruta: row['Ruta'] || '--',
-                        MCC: row['MCC'] || '0',
-                        MNC: row['MNC'] || '0',
-                        Operador: row['Operador'] || 'Todos',
-                        Tarifa: row['Tarifa'] || 0,
-                        Moneda: row['Moneda'] || 'USD'
+                        Ruta: item.ruta,
+                        MCC: item.mcc,
+                        MNC: item.mnc,
+                        Operador: item.operador,
+                        Tarifa: item.tarifa,
+                        Moneda: item.moneda
                     });
                 });
 
@@ -262,6 +334,9 @@ $(document).ready(function() {
         // Eventos de búsqueda
         $('#searchCountry').on('keyup', filtrarTarjetas);
         $('#filterProvider').on('change', filtrarTarjetas);
+        $(document).on('click', '.js-open-prov', function() { abrirProv($(this).attr('data-country')); });
+        $(document).on('click', '.js-open-sales', function() { abrirVentas($(this).attr('data-country')); });
+        $(document).on('click', '.js-open-live', function() { showLiveTraffic($(this).attr('data-country')); });
     });
             
     function formatDualCurrency(amount, currency) {
@@ -303,9 +378,9 @@ $(document).ready(function() {
             rutas.sort((a,b) => (a.Proveedor || '').localeCompare(b.Proveedor || '')).forEach(r => {
                 const mcc_mnc = `${r.MCC || '0'}/${r.MNC || '0'}`;
                 tbody.append(`<tr>
-                    <td class="fw-bold text-primary align-middle">${r.Proveedor || '--'}</td>
-                    <td class="align-middle"><span class="badge bg-secondary">${r.Ruta || '--'}</span></td>
-                    <td class="align-middle"><small>${r.Operador || 'Todos'}</small> <br><span class="text-muted" style="font-size: 0.7rem;">[${mcc_mnc}]</span></td>
+                    <td class="fw-bold text-primary align-middle">${escapeHtml(r.Proveedor || '--')}</td>
+                    <td class="align-middle"><span class="badge bg-secondary">${escapeHtml(r.Ruta || '--')}</span></td>
+                    <td class="align-middle"><small>${escapeHtml(r.Operador || 'Todos')}</small> <br><span class="text-muted" style="font-size: 0.7rem;">[${escapeHtml(mcc_mnc)}]</span></td>
                     <td class="text-center align-middle">${formatDualCurrency(r.Tarifa, r.Moneda)}</td>
                 </tr>`);
             });
@@ -320,8 +395,8 @@ $(document).ready(function() {
             });
             Object.values(agrupado).sort((a,b) => (a.Proveedor || '').localeCompare(b.Proveedor || '')).forEach(r => {
                 tbody.append(`<tr>
-                    <td class="fw-bold text-primary align-middle">${r.Proveedor || '--'}</td>
-                    <td class="align-middle"><span class="badge bg-secondary">${r.Ruta || '--'}</span></td>
+                    <td class="fw-bold text-primary align-middle">${escapeHtml(r.Proveedor || '--')}</td>
+                    <td class="align-middle"><span class="badge bg-secondary">${escapeHtml(r.Ruta || '--')}</span></td>
                     <td class="text-center align-middle">${formatDualCurrency(r.Tarifa, r.Moneda)}</td>
                 </tr>`);
             });
@@ -361,9 +436,9 @@ $(document).ready(function() {
             rutas.sort((a,b) => (a.Cliente || '').localeCompare(b.Cliente || '')).forEach(r => {
                 const mcc_mnc = `${r.MCC || '0'}/${r.MNC || '0'}`;
                 tbody.append(`<tr>
-                    <td class="fw-bold text-indigo align-middle">${r.Cliente || '--'}</td>
-                    <td class="align-middle"><span class="badge bg-light text-dark border">${r.Ruta || '--'}</span></td>
-                    <td class="align-middle"><small>${r.Operador || 'Todos'}</small> <br><span class="text-muted" style="font-size: 0.7rem;">[${mcc_mnc}]</span></td>
+                    <td class="fw-bold text-indigo align-middle">${escapeHtml(r.Cliente || '--')}</td>
+                    <td class="align-middle"><span class="badge bg-light text-dark border">${escapeHtml(r.Ruta || '--')}</span></td>
+                    <td class="align-middle"><small>${escapeHtml(r.Operador || 'Todos')}</small> <br><span class="text-muted" style="font-size: 0.7rem;">[${escapeHtml(mcc_mnc)}]</span></td>
                     <td class="text-center align-middle">${formatDualCurrency(r.Tarifa, r.Moneda)}</td>
                 </tr>`);
             });
@@ -378,8 +453,8 @@ $(document).ready(function() {
             });
             Object.values(agrupado).sort((a,b) => (a.Cliente || '').localeCompare(b.Cliente || '')).forEach(r => {
                 tbody.append(`<tr>
-                    <td class="fw-bold text-indigo align-middle">${r.Cliente || '--'}</td>
-                    <td class="align-middle"><span class="badge bg-light text-dark border">${r.Ruta || '--'}</span></td>
+                    <td class="fw-bold text-indigo align-middle">${escapeHtml(r.Cliente || '--')}</td>
+                    <td class="align-middle"><span class="badge bg-light text-dark border">${escapeHtml(r.Ruta || '--')}</span></td>
                     <td class="text-center align-middle">${formatDualCurrency(r.Tarifa, r.Moneda)}</td>
                 </tr>`);
             });
@@ -391,26 +466,30 @@ $(document).ready(function() {
     function renderizarTarjetas() {
         const container = $('#cardsContainer');
         container.empty();
-        const paises = Object.keys(globalData).sort((a, b) => (trafficVolumes[b] || 0) - (trafficVolumes[a] || 0));
+        const paises = [...new Set([...Object.keys(globalData), ...Object.keys(globalSalesData)])]
+            .sort((a, b) => (trafficVolumes[b] || 0) - (trafficVolumes[a] || 0) || a.localeCompare(b));
 
         paises.forEach(nombre => {
-            const info = globalData[nombre];
+            const info = globalData[nombre] || { nombre, proveedores: new Set(), rutas: [] };
+            const ventas = globalSalesData[nombre]?.rutas?.length || 0;
             const codigoIso = banderasISO[nombre.toLowerCase().trim()];
             const flag = codigoIso ? `<img src="https://flagcdn.com/w40/${codigoIso}.png" width="40" class="mb-3 rounded shadow-sm">` : '🌐';
             const live = trafficVolumes[nombre] ? `<div class="mb-2 text-danger fw-bold" style="font-size: 11px;">🔥 ${trafficVolumes[nombre]} SMS</div>` : '';
+            const proveedoresTexto = `${info.proveedores.size} Proveedores`;
+            const ventasTexto = ventas ? `<div class="badge bg-light text-dark border mb-3 ms-1">${ventas} Ventas</div>` : '';
 
             container.append(`
-                <div class="col-xl-3 col-lg-4 col-md-6 mb-4 card-item" data-pais="${nombre.toLowerCase()}" data-proveedores="${Array.from(info.proveedores).join(',').toLowerCase()}">
+                <div class="col-xl-3 col-lg-4 col-md-6 mb-4 card-item" data-pais="${escapeAttr(nombre.toLowerCase())}" data-proveedores="${escapeAttr(Array.from(info.proveedores).join(',').toLowerCase())}">
                     <div class="card country-card h-100 shadow-sm bg-white">
                         <div class="card-body text-center">
                             ${flag}
-                            <h5 class="card-title mb-1">${nombre}</h5>
+                            <h5 class="card-title mb-1">${escapeHtml(nombre)}</h5>
                             ${live}
-                            <div class="badge bg-light text-dark border mb-3">${info.proveedores.size} Proveedores</div>
+                            <div class="badge bg-light text-dark border mb-3">${escapeHtml(proveedoresTexto)}</div>${ventasTexto}
                             <div class="d-grid gap-2">
-                                <button onclick="abrirProv('${nombre}')" class="btn btn-action btn-prov">📦 Costos Prov.</button>
-                                <button onclick="abrirVentas('${nombre}')" class="btn btn-action btn-sale">💰 Precios Venta</button>
-                                <button onclick="showLiveTraffic('${nombre}')" class="btn btn-action btn-live">📡 Tráfico Live</button>
+                                <button type="button" data-country="${escapeAttr(nombre)}" class="btn btn-action btn-prov js-open-prov">📦 Costos Prov.</button>
+                                <button type="button" data-country="${escapeAttr(nombre)}" class="btn btn-action btn-sale js-open-sales">💰 Precios Venta</button>
+                                <button type="button" data-country="${escapeAttr(nombre)}" class="btn btn-action btn-live js-open-live">📡 Tráfico Live</button>
                             </div>
                         </div>
                     </div>
@@ -421,15 +500,19 @@ $(document).ready(function() {
 
     function llenarFiltroProveedores() {
         const select = $('#filterProvider');
-        Array.from(allProviders).sort().forEach(p => select.append(`<option value="${p.toLowerCase()}">${p}</option>`));
+        Array.from(allProviders).sort().forEach(p => {
+            select.append(`<option value="${escapeAttr(p.toLowerCase())}">${escapeHtml(p)}</option>`);
+        });
     }
 
     function filtrarTarjetas() {
-        const txt = $('#searchCountry').val().toLowerCase();
+        const txt = ($('#searchCountry').val() || '').toLowerCase();
         const prov = $('#filterProvider').val();
         $('.card-item').each(function() {
-            const mTxt = $(this).data('pais').includes(txt);
-            const mPrv = (prov === "ALL") || $(this).data('proveedores').includes(prov);
+            const pais = String($(this).attr('data-pais') || '');
+            const proveedores = String($(this).attr('data-proveedores') || '');
+            const mTxt = pais.includes(txt);
+            const mPrv = (prov === "ALL") || proveedores.includes(prov);
             $(this).toggle(mTxt && mPrv);
         });
     }
