@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>SaaS Dashboard | SMS Analytics Pro</title>
+    <title>SaaS Dashboard | SMS Analytics</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -21,6 +21,11 @@
         .kpi-label { font-size: 12px; color: #94a3b8; text-transform: uppercase; margin-bottom: 8px; font-weight: 600; }
         .kpi-value { font-size: 28px; font-weight: 700; }
         .charts-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(450px, 1fr)); gap: 24px; margin-bottom: 32px; }
+        .chart-header { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 12px; }
+        .chart-header h3 { margin: 0; }
+        .chart-control { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+        .chart-control label { font-size: 11px; color: #94a3b8; text-transform: uppercase; font-weight: 700; }
+        .chart-control select { width: auto; min-width: 120px; padding: 8px 10px; }
         table { width: 100%; border-collapse: collapse; }
         th { text-align: left; padding: 12px; font-size: 11px; text-transform: uppercase; color: #94a3b8; border-bottom: 2px solid var(--border); }
         td { padding: 14px 12px; font-size: 14px; border-bottom: 1px solid var(--border); }
@@ -92,8 +97,23 @@
         <div class="kpi-grid" id="kpis"></div>
 
         <div class="charts-row">
-            <div class="card"><h3>Volumen Real por Destino (SMS Parts)</h3><canvas id="chartCountry"></canvas></div>
-            <div class="card"><h3>Tendencia de Tráfico Diaria</h3><canvas id="chartTrend"></canvas></div>
+            <div class="card"><h3>SMS enviado por Destino (SMS Parts)</h3><canvas id="chartCountry"></canvas></div>
+            <div class="card">
+                <div class="chart-header">
+                    <h3>Tráfico diario</h3>
+                    <div class="chart-control">
+                        <label for="trend-days">Ver</label>
+                        <select id="trend-days">
+                            <option value="7" selected>7 días</option>
+                            <option value="14">14 días</option>
+                            <option value="30">30 días</option>
+                            <option value="60">60 días</option>
+                            <option value="90">90 días</option>
+                        </select>
+                    </div>
+                </div>
+                <canvas id="chartTrend"></canvas>
+            </div>
         </div>
 
         <div class="card" style="overflow-x: auto;">
@@ -182,31 +202,42 @@ async function verificarLogin() {
             fill('f-client', 'CompanyName');
             fill('f-country', 'CountryRealName');
             fill('f-operator', 'OperatorName');
-            setDefaultDateRange(7);
 
             ['f-start', 'f-end', 'f-client', 'f-country', 'f-operator'].forEach(id => {
                 document.getElementById(id).addEventListener('change', updateDashboard);
             });
+            document.getElementById('trend-days').addEventListener('change', updateTrendChart);
             updateDashboard();
         }
 
         function updateDashboard() {
+            const filtered = getFilteredData({ includeDateRange: true });
+
+            renderDashboard(filtered, filtered);
+        }
+
+        function updateTrendChart() {
+            renderTrendChart(getFilteredData({ includeDateRange: true }));
+        }
+
+        function getFilteredData({ includeDateRange = true } = {}) {
             const start = document.getElementById('f-start').value;
             const end = document.getElementById('f-end').value;
             const client = document.getElementById('f-client').value;
             const country = document.getElementById('f-country').value;
             const op = document.getElementById('f-operator').value;
 
-            const filtered = rawData.filter(d => {
+            return rawData.filter(d => {
                 const dateKey = d.SubmitDateKey || normalizeDateKey(d.SubmitDate);
-                return (!start || (dateKey && dateKey >= start)) &&
-                       (!end || (dateKey && dateKey <= end)) &&
+                const dateOk = !includeDateRange ||
+                       ((!start || (dateKey && dateKey >= start)) &&
+                       (!end || (dateKey && dateKey <= end)));
+
+                return dateOk &&
                        (!client || d.CompanyName === client) &&
                        (!country || d.CountryRealName === country) &&
                        (!op || d.OperatorName === op);
             });
-
-            renderDashboard(filtered);
         }
 
         function normalizeDateKey(value) {
@@ -246,16 +277,11 @@ async function verificarLogin() {
             return `${y}-${m}-${d}`;
         }
 
-        function setDefaultDateRange(days) {
-            const dateKeys = [...new Set(rawData.map(d => d.SubmitDateKey).filter(Boolean))].sort();
-            if (!dateKeys.length) return;
-
-            const endDate = new Date(`${dateKeys[dateKeys.length - 1]}T00:00:00`);
-            const startDate = new Date(endDate);
-            startDate.setDate(endDate.getDate() - (days - 1));
-
-            document.getElementById('f-start').value = formatDateInput(startDate);
-            document.getElementById('f-end').value = formatDateInput(endDate);
+        function shiftDateKey(dateKey, offsetDays) {
+            const date = new Date(`${dateKey}T00:00:00`);
+            if (Number.isNaN(date.getTime())) return '';
+            date.setDate(date.getDate() + offsetDays);
+            return formatDateInput(date);
         }
 
         function getDateRangeKeys(startKey, endKey) {
@@ -271,7 +297,7 @@ async function verificarLogin() {
             return keys;
         }
 
-        function renderDashboard(data) {
+        function renderDashboard(data, trendData = data) {
             const totalVol = data.reduce((s, d) => s + (Number(d.MessageParts) || 0), 0);
             const totalRev = data.reduce((s, d) => s + (Number(d.ClientCostUSD) || 0), 0);
             const totalCost = data.reduce((s, d) => s + (Number(d.TerminationCostUSD) || 0), 0);
@@ -290,11 +316,11 @@ async function verificarLogin() {
                 <div class="card kpi-card" style="border-left-color: var(--warning)"><div class="kpi-label">Eficiencia DLR / Latencia</div><div class="kpi-value">${deliveryRate}% <small style="font-size:14px; color:#94a3b8">/ ${avgDelay}s</small></div></div>
             `;
 
-            renderCharts(data);
+            renderCharts(data, trendData);
             renderTable(data);
         }
 
-        function renderCharts(data) {
+        function renderCharts(data, trendData = data) {
             const countries = {};
             data.forEach(d => { if(d.CountryRealName) countries[d.CountryRealName] = (countries[d.CountryRealName] || 0) + (Number(d.MessageParts) || 0); });
             const top = Object.entries(countries).sort((a,b) => b[1]-a[1]).slice(0,10);
@@ -321,16 +347,22 @@ async function verificarLogin() {
                 }
             });
 
+            renderTrendChart(trendData);
+        }
+
+        function renderTrendChart(data) {
             const trend = {};
             data.forEach(d => {
                 const dateKey = d.SubmitDateKey || normalizeDateKey(d.SubmitDate);
                 if(dateKey) trend[dateKey] = (trend[dateKey] || 0) + (Number(d.MessageParts) || 0);
             });
-            const start = document.getElementById('f-start').value;
-            const end = document.getElementById('f-end').value;
-            const sorted = (start && end)
+            const days = Number(document.getElementById('trend-days').value) || 7;
+            const dateKeys = Object.keys(trend).sort();
+            const end = dateKeys[dateKeys.length - 1];
+            const start = end ? shiftDateKey(end, -(days - 1)) : '';
+            const sorted = start && end
                 ? getDateRangeKeys(start, end).map(dateKey => [dateKey, trend[dateKey] || 0])
-                : Object.entries(trend).sort((a,b) => a[0].localeCompare(b[0])); // Ordena las fechas alfanumericamente
+                : [];
 
             if(charts.t) charts.t.destroy();
             charts.t = new Chart(document.getElementById('chartTrend'), {
