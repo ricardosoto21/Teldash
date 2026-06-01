@@ -114,6 +114,7 @@
         let rawData = [];
         let charts = {}; 
 window.charts = charts;
+        const chartColors = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#06b6d4', '#8b5cf6', '#22c55e', '#f97316', '#ec4899', '#94a3b8'];
 
         // 1. SISTEMA DE LOGIN
         window.addEventListener('DOMContentLoaded', () => {
@@ -161,6 +162,7 @@ async function verificarLogin() {
                 const wb = XLSX.read(buffer, { type: 'array' });
                 // FIX FECHAS: raw: false obliga a JS a leer el Excel exactamente como texto visible (Ej: 2026-02-14)
                 rawData = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { raw: false });
+                rawData.forEach(d => { d.SubmitDateKey = normalizeDateKey(d.SubmitDate); });
                 document.getElementById('status-bar').innerText = "✅ " + rawData.length + " Grupos Cargados";
                 initFilters();
             } catch (e) {
@@ -180,6 +182,7 @@ async function verificarLogin() {
             fill('f-client', 'CompanyName');
             fill('f-country', 'CountryRealName');
             fill('f-operator', 'OperatorName');
+            setDefaultDateRange(7);
 
             ['f-start', 'f-end', 'f-client', 'f-country', 'f-operator'].forEach(id => {
                 document.getElementById(id).addEventListener('change', updateDashboard);
@@ -195,14 +198,77 @@ async function verificarLogin() {
             const op = document.getElementById('f-operator').value;
 
             const filtered = rawData.filter(d => {
-                return (!start || d.SubmitDate >= start) &&
-                       (!end || d.SubmitDate <= end) &&
+                const dateKey = d.SubmitDateKey || normalizeDateKey(d.SubmitDate);
+                return (!start || (dateKey && dateKey >= start)) &&
+                       (!end || (dateKey && dateKey <= end)) &&
                        (!client || d.CompanyName === client) &&
                        (!country || d.CountryRealName === country) &&
                        (!op || d.OperatorName === op);
             });
 
             renderDashboard(filtered);
+        }
+
+        function normalizeDateKey(value) {
+            if (!value) return '';
+            if (value instanceof Date && !Number.isNaN(value.getTime())) return formatDateInput(value);
+            if (typeof value === 'number') {
+                const date = new Date(Math.round((value - 25569) * 86400 * 1000));
+                return Number.isNaN(date.getTime()) ? '' : formatDateInput(date);
+            }
+
+            const text = String(value).trim().split(' ')[0];
+            const isoMatch = text.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})$/);
+            if (isoMatch) return buildDateKey(isoMatch[1], isoMatch[2], isoMatch[3]);
+
+            const parts = text.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{2,4})$/);
+            if (!parts) return '';
+
+            let first = Number(parts[1]);
+            let second = Number(parts[2]);
+            let year = Number(parts[3]);
+            if (year < 100) year += 2000;
+
+            const month = first > 12 ? second : first;
+            const day = first > 12 ? first : second;
+            return buildDateKey(year, month, day);
+        }
+
+        function buildDateKey(year, month, day) {
+            const date = new Date(Number(year), Number(month) - 1, Number(day));
+            return Number.isNaN(date.getTime()) ? '' : formatDateInput(date);
+        }
+
+        function formatDateInput(date) {
+            const y = date.getFullYear();
+            const m = String(date.getMonth() + 1).padStart(2, '0');
+            const d = String(date.getDate()).padStart(2, '0');
+            return `${y}-${m}-${d}`;
+        }
+
+        function setDefaultDateRange(days) {
+            const dateKeys = [...new Set(rawData.map(d => d.SubmitDateKey).filter(Boolean))].sort();
+            if (!dateKeys.length) return;
+
+            const endDate = new Date(`${dateKeys[dateKeys.length - 1]}T00:00:00`);
+            const startDate = new Date(endDate);
+            startDate.setDate(endDate.getDate() - (days - 1));
+
+            document.getElementById('f-start').value = formatDateInput(startDate);
+            document.getElementById('f-end').value = formatDateInput(endDate);
+        }
+
+        function getDateRangeKeys(startKey, endKey) {
+            const keys = [];
+            const cursor = new Date(`${startKey}T00:00:00`);
+            const endDate = new Date(`${endKey}T00:00:00`);
+
+            while (cursor <= endDate && keys.length < 370) {
+                keys.push(formatDateInput(cursor));
+                cursor.setDate(cursor.getDate() + 1);
+            }
+
+            return keys;
         }
 
         function renderDashboard(data) {
@@ -235,20 +301,48 @@ async function verificarLogin() {
 
             if(charts.c) charts.c.destroy();
             charts.c = new Chart(document.getElementById('chartCountry'), {
-                type: 'bar',
-                data: { labels: top.map(x=>x[0]), datasets: [{ label: 'SMS Parts', data: top.map(x=>x[1]), backgroundColor: '#6366f1', borderRadius: 6 }] },
-                options: { plugins: { legend: { display: false } }, scales: { y: { grid: { color: '#334155' } } } }
+                type: 'pie',
+                data: { labels: top.map(x=>x[0]), datasets: [{ label: 'SMS Parts', data: top.map(x=>x[1]), backgroundColor: chartColors, borderColor: '#1e293b', borderWidth: 2 }] },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { position: 'right', labels: { color: '#f8fafc', boxWidth: 12, padding: 14 } },
+                        tooltip: {
+                            callbacks: {
+                                label: (ctx) => {
+                                    const value = Number(ctx.raw) || 0;
+                                    const total = ctx.dataset.data.reduce((sum, item) => sum + Number(item || 0), 0);
+                                    const pct = total > 0 ? ` (${(value / total * 100).toFixed(1)}%)` : '';
+                                    return `${ctx.label}: ${value.toLocaleString()}${pct}`;
+                                }
+                            }
+                        }
+                    }
+                }
             });
 
             const trend = {};
-            data.forEach(d => { if(d.SubmitDate) trend[d.SubmitDate] = (trend[d.SubmitDate] || 0) + (Number(d.MessageParts) || 0); });
-            const sorted = Object.entries(trend).sort((a,b) => a[0].localeCompare(b[0])); // Ordena las fechas alfanumericamente
+            data.forEach(d => {
+                const dateKey = d.SubmitDateKey || normalizeDateKey(d.SubmitDate);
+                if(dateKey) trend[dateKey] = (trend[dateKey] || 0) + (Number(d.MessageParts) || 0);
+            });
+            const start = document.getElementById('f-start').value;
+            const end = document.getElementById('f-end').value;
+            const sorted = (start && end)
+                ? getDateRangeKeys(start, end).map(dateKey => [dateKey, trend[dateKey] || 0])
+                : Object.entries(trend).sort((a,b) => a[0].localeCompare(b[0])); // Ordena las fechas alfanumericamente
 
             if(charts.t) charts.t.destroy();
             charts.t = new Chart(document.getElementById('chartTrend'), {
-                type: 'line',
-                data: { labels: sorted.map(x=>x[0]), datasets: [{ label: 'Volumen Diario', data: sorted.map(x=>x[1]), borderColor: '#10b981', tension: 0.3, fill: true, backgroundColor: 'rgba(16, 185, 129, 0.1)' }] },
-                options: { plugins: { legend: { display: false } } }
+                type: 'bar',
+                data: { labels: sorted.map(x=>x[0]), datasets: [{ label: 'Volumen Diario', data: sorted.map(x=>x[1]), backgroundColor: '#10b981', borderRadius: 6 }] },
+                options: {
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { grid: { display: false }, ticks: { color: '#94a3b8' } },
+                        y: { beginAtZero: true, grid: { color: '#334155' }, ticks: { color: '#94a3b8' } }
+                    }
+                }
             });
         }
 
@@ -282,4 +376,3 @@ async function verificarLogin() {
     </script>
 </body>
 </html>
-
