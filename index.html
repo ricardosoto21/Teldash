@@ -26,6 +26,9 @@
         .chart-control { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
         .chart-control label { font-size: 11px; color: #94a3b8; text-transform: uppercase; font-weight: 700; }
         .chart-control select { width: auto; min-width: 120px; padding: 8px 10px; }
+        .chart-reset { background: transparent; color: #a5b4fc; border: 1px solid #6366f1; padding: 7px 10px; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 600; }
+        .chart-reset:hover { background: rgba(99, 102, 241, 0.15); color: white; }
+        .chart-reset[hidden] { display: none; }
         table { width: 100%; border-collapse: collapse; }
         th { text-align: left; padding: 12px; font-size: 11px; text-transform: uppercase; color: #94a3b8; border-bottom: 2px solid var(--border); }
         td { padding: 14px 12px; font-size: 14px; border-bottom: 1px solid var(--border); }
@@ -97,7 +100,13 @@
         <div class="kpi-grid" id="kpis"></div>
 
         <div class="charts-row">
-            <div class="card"><h3>SMS enviado por Destino (SMS Parts)</h3><canvas id="chartCountry"></canvas></div>
+            <div class="card">
+                <div class="chart-header">
+                    <h3 id="country-chart-title">SMS enviado por Destino (SMS Parts)</h3>
+                    <button type="button" id="reset-country-chart" class="chart-reset" hidden>Ver total</button>
+                </div>
+                <canvas id="chartCountry"></canvas>
+            </div>
             <div class="card">
                 <div class="chart-header">
                     <h3>Tráfico diario</h3>
@@ -134,6 +143,8 @@
         let rawData = [];
         let charts = {}; 
 window.charts = charts;
+        let currentDashboardData = [];
+        let selectedTrendDate = '';
         const chartColors = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#06b6d4', '#8b5cf6', '#22c55e', '#f97316', '#ec4899', '#94a3b8'];
 
         // 1. SISTEMA DE LOGIN
@@ -207,11 +218,14 @@ async function verificarLogin() {
                 document.getElementById(id).addEventListener('change', updateDashboard);
             });
             document.getElementById('trend-days').addEventListener('change', updateTrendChart);
+            document.getElementById('reset-country-chart').addEventListener('click', resetCountryChart);
             updateDashboard();
         }
 
         function updateDashboard() {
             const filtered = getFilteredData({ includeDateRange: true });
+            currentDashboardData = filtered;
+            selectedTrendDate = '';
 
             renderDashboard(filtered, filtered);
         }
@@ -321,9 +335,21 @@ async function verificarLogin() {
         }
 
         function renderCharts(data, trendData = data) {
+            renderCountryChart(data);
+            renderTrendChart(trendData);
+        }
+
+        function renderCountryChart(data, dateKey = '') {
             const countries = {};
             data.forEach(d => { if(d.CountryRealName) countries[d.CountryRealName] = (countries[d.CountryRealName] || 0) + (Number(d.MessageParts) || 0); });
             const top = Object.entries(countries).sort((a,b) => b[1]-a[1]).slice(0,10);
+            const title = document.getElementById('country-chart-title');
+            const resetButton = document.getElementById('reset-country-chart');
+
+            title.textContent = dateKey
+                ? `SMS enviado por Destino - ${dateKey}`
+                : 'SMS enviado por Destino (SMS Parts)';
+            resetButton.hidden = !dateKey;
 
             if(charts.c) charts.c.destroy();
             charts.c = new Chart(document.getElementById('chartCountry'), {
@@ -346,8 +372,31 @@ async function verificarLogin() {
                     }
                 }
             });
+        }
 
-            renderTrendChart(trendData);
+        function showDayInCountryChart(dateKey) {
+            const dayData = currentDashboardData.filter(d => {
+                return (d.SubmitDateKey || normalizeDateKey(d.SubmitDate)) === dateKey;
+            });
+            if (!dayData.length) return;
+
+            selectedTrendDate = dateKey;
+            renderCountryChart(dayData, dateKey);
+            highlightTrendDate(dateKey);
+        }
+
+        function resetCountryChart() {
+            selectedTrendDate = '';
+            renderCountryChart(currentDashboardData);
+            highlightTrendDate('');
+        }
+
+        function highlightTrendDate(dateKey) {
+            if (!charts.t) return;
+            charts.t.data.datasets[0].backgroundColor = charts.t.data.labels.map(label => {
+                return label === dateKey ? '#f59e0b' : '#10b981';
+            });
+            charts.t.update();
         }
 
         function renderTrendChart(data) {
@@ -367,8 +416,27 @@ async function verificarLogin() {
             if(charts.t) charts.t.destroy();
             charts.t = new Chart(document.getElementById('chartTrend'), {
                 type: 'bar',
-                data: { labels: sorted.map(x=>x[0]), datasets: [{ label: 'Volumen Diario', data: sorted.map(x=>x[1]), backgroundColor: '#10b981', borderRadius: 6 }] },
+                data: {
+                    labels: sorted.map(x=>x[0]),
+                    datasets: [{
+                        label: 'Volumen Diario',
+                        data: sorted.map(x=>x[1]),
+                        backgroundColor: sorted.map(x => x[0] === selectedTrendDate ? '#f59e0b' : '#10b981'),
+                        borderRadius: 6
+                    }]
+                },
                 options: {
+                    onClick: (event, elements) => {
+                        if (!elements.length) return;
+                        const selected = sorted[elements[0].index];
+                        if (!selected || selected[1] <= 0) return;
+                        showDayInCountryChart(selected[0]);
+                    },
+                    onHover: (event, elements) => {
+                        if (event.native?.target) {
+                            event.native.target.style.cursor = elements.length ? 'pointer' : 'default';
+                        }
+                    },
                     plugins: { legend: { display: false } },
                     scales: {
                         x: { grid: { display: false }, ticks: { color: '#94a3b8' } },
