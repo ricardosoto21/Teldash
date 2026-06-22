@@ -88,8 +88,10 @@ Responsabilidades:
 - KPIs principales: mensajes, ingresos, costos, utilidad, DLR y latencia.
 - Grafico de pastel: volumen real por destino.
 - Grafico de barras: tendencia diaria.
+- Grafico combinado por vendor: barras de `MessageParts` y linea de `TerminationCostUSD`, ordenado por volumen y limitado mediante selector.
 - Selector independiente para ver la tendencia de los ultimos `7`, `14`, `30`, `60` o `90` dias sin modificar los otros componentes.
-- Drill-down interactivo: al seleccionar una barra diaria, el grafico de pastel muestra el detalle por destino de ese dia sin modificar KPIs, filtros ni tabla.
+- Drill-down interactivo: al seleccionar una barra diaria, los graficos de destino y vendor muestran el detalle de ese dia sin modificar KPIs, filtros ni tabla.
+- El boton `Ver total` restaura simultaneamente ambos graficos analiticos.
 - Tabla de desglose financiero por cliente.
 
 Tecnologias usadas:

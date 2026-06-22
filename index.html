@@ -29,6 +29,9 @@
         .chart-reset { background: transparent; color: #a5b4fc; border: 1px solid #6366f1; padding: 7px 10px; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 600; }
         .chart-reset:hover { background: rgba(99, 102, 241, 0.15); color: white; }
         .chart-reset[hidden] { display: none; }
+        .vendor-chart-scroll { overflow-x: auto; padding-bottom: 4px; }
+        .vendor-chart-inner { position: relative; min-width: 100%; height: 380px; }
+        .chart-empty { display: none; min-height: 220px; align-items: center; justify-content: center; color: #94a3b8; font-size: 14px; }
         table { width: 100%; border-collapse: collapse; }
         th { text-align: left; padding: 12px; font-size: 11px; text-transform: uppercase; color: #94a3b8; border-bottom: 2px solid var(--border); }
         td { padding: 14px 12px; font-size: 14px; border-bottom: 1px solid var(--border); }
@@ -60,6 +63,13 @@
         .btn-destinos:hover {
             background: var(--primary);
             color: white;
+        }
+        @media (max-width: 640px) {
+            .charts-row { grid-template-columns: minmax(0, 1fr); }
+            .chart-header { align-items: stretch; flex-direction: column; }
+            .chart-control { justify-content: space-between; }
+            .chart-control select { flex: 1; min-width: 0; }
+            .vendor-chart-inner { height: 340px; }
         }
     </style>
 </head>
@@ -122,6 +132,27 @@
                     </div>
                 </div>
                 <canvas id="chartTrend"></canvas>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="chart-header">
+                <h3 id="vendor-chart-title">Costo y SMS por vendor</h3>
+                <div class="chart-control">
+                    <label for="vendor-limit">Mostrar</label>
+                    <select id="vendor-limit">
+                        <option value="5">Top 5</option>
+                        <option value="10" selected>Top 10</option>
+                        <option value="20">Top 20</option>
+                        <option value="all">Todos</option>
+                    </select>
+                </div>
+            </div>
+            <div id="vendor-chart-empty" class="chart-empty">No hay información de vendors para los filtros seleccionados.</div>
+            <div id="vendor-chart-scroll" class="vendor-chart-scroll">
+                <div id="vendor-chart-inner" class="vendor-chart-inner">
+                    <canvas id="chartVendor"></canvas>
+                </div>
             </div>
         </div>
 
@@ -218,6 +249,7 @@ async function verificarLogin() {
                 document.getElementById(id).addEventListener('change', updateDashboard);
             });
             document.getElementById('trend-days').addEventListener('change', updateTrendChart);
+            document.getElementById('vendor-limit').addEventListener('change', updateVendorChart);
             document.getElementById('reset-country-chart').addEventListener('click', resetCountryChart);
             updateDashboard();
         }
@@ -232,6 +264,10 @@ async function verificarLogin() {
 
         function updateTrendChart() {
             renderTrendChart(getFilteredData({ includeDateRange: true }));
+        }
+
+        function updateVendorChart() {
+            renderVendorChart(getActiveAnalyticsData());
         }
 
         function getFilteredData({ includeDateRange = true } = {}) {
@@ -337,6 +373,7 @@ async function verificarLogin() {
         function renderCharts(data, trendData = data) {
             renderCountryChart(data);
             renderTrendChart(trendData);
+            renderVendorChart(data);
         }
 
         function renderCountryChart(data, dateKey = '') {
@@ -374,20 +411,28 @@ async function verificarLogin() {
             });
         }
 
-        function showDayInCountryChart(dateKey) {
-            const dayData = currentDashboardData.filter(d => {
-                return (d.SubmitDateKey || normalizeDateKey(d.SubmitDate)) === dateKey;
+        function getActiveAnalyticsData() {
+            if (!selectedTrendDate) return currentDashboardData;
+
+            return currentDashboardData.filter(d => {
+                return (d.SubmitDateKey || normalizeDateKey(d.SubmitDate)) === selectedTrendDate;
             });
+        }
+
+        function showDayInAnalytics(dateKey) {
+            selectedTrendDate = dateKey;
+            const dayData = getActiveAnalyticsData();
             if (!dayData.length) return;
 
-            selectedTrendDate = dateKey;
             renderCountryChart(dayData, dateKey);
+            renderVendorChart(dayData, dateKey);
             highlightTrendDate(dateKey);
         }
 
         function resetCountryChart() {
             selectedTrendDate = '';
             renderCountryChart(currentDashboardData);
+            renderVendorChart(currentDashboardData);
             highlightTrendDate('');
         }
 
@@ -397,6 +442,123 @@ async function verificarLogin() {
                 return label === dateKey ? '#f59e0b' : '#10b981';
             });
             charts.t.update();
+        }
+
+        function renderVendorChart(data, dateKey = selectedTrendDate) {
+            const vendors = {};
+            data.forEach(d => {
+                const rawName = String(d.VendorAccountName ?? '').trim();
+                const vendorName = !rawName || rawName.toUpperCase() === 'N/A' ? 'Sin vendor' : rawName;
+
+                if (!vendors[vendorName]) vendors[vendorName] = { volume: 0, cost: 0 };
+                vendors[vendorName].volume += Number(d.MessageParts) || 0;
+                vendors[vendorName].cost += Number(d.TerminationCostUSD) || 0;
+            });
+
+            const limitValue = document.getElementById('vendor-limit').value;
+            const allVendors = Object.entries(vendors)
+                .sort((a, b) => b[1].volume - a[1].volume || b[1].cost - a[1].cost || a[0].localeCompare(b[0]));
+            const selectedVendors = limitValue === 'all'
+                ? allVendors
+                : allVendors.slice(0, Number(limitValue) || 10);
+
+            const title = document.getElementById('vendor-chart-title');
+            const emptyState = document.getElementById('vendor-chart-empty');
+            const scrollContainer = document.getElementById('vendor-chart-scroll');
+            const chartContainer = document.getElementById('vendor-chart-inner');
+
+            title.textContent = dateKey
+                ? `Costo y SMS por vendor - ${dateKey}`
+                : 'Costo y SMS por vendor';
+
+            if (charts.v) {
+                charts.v.destroy();
+                charts.v = null;
+            }
+
+            if (!selectedVendors.length) {
+                emptyState.style.display = 'flex';
+                scrollContainer.style.display = 'none';
+                return;
+            }
+
+            emptyState.style.display = 'none';
+            scrollContainer.style.display = 'block';
+            chartContainer.style.width = selectedVendors.length > 10
+                ? `${Math.max(1000, selectedVendors.length * 95)}px`
+                : '100%';
+            scrollContainer.scrollLeft = 0;
+
+            charts.v = new Chart(document.getElementById('chartVendor'), {
+                type: 'bar',
+                data: {
+                    labels: selectedVendors.map(([name]) => name),
+                    datasets: [
+                        {
+                            type: 'bar',
+                            label: 'SMS enviados',
+                            data: selectedVendors.map(([, values]) => values.volume),
+                            backgroundColor: '#6366f1',
+                            borderRadius: 6,
+                            yAxisID: 'ySms',
+                            order: 2
+                        },
+                        {
+                            type: 'line',
+                            label: 'Costo USD',
+                            data: selectedVendors.map(([, values]) => values.cost),
+                            borderColor: '#f59e0b',
+                            backgroundColor: '#f59e0b',
+                            borderWidth: 3,
+                            pointRadius: 4,
+                            pointHoverRadius: 6,
+                            tension: 0.25,
+                            yAxisID: 'yCost',
+                            order: 1
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: {
+                        legend: { labels: { color: '#f8fafc', boxWidth: 12, padding: 16 } },
+                        tooltip: {
+                            callbacks: {
+                                label: (ctx) => ctx.dataset.yAxisID === 'yCost'
+                                    ? `${ctx.dataset.label}: $${Number(ctx.raw || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                                    : `${ctx.dataset.label}: ${Number(ctx.raw || 0).toLocaleString()}`
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: { display: false },
+                            ticks: { color: '#94a3b8', maxRotation: 45, minRotation: 0 }
+                        },
+                        ySms: {
+                            type: 'linear',
+                            position: 'left',
+                            beginAtZero: true,
+                            grid: { color: '#334155' },
+                            ticks: { color: '#94a3b8' },
+                            title: { display: true, text: 'SMS enviados', color: '#94a3b8' }
+                        },
+                        yCost: {
+                            type: 'linear',
+                            position: 'right',
+                            beginAtZero: true,
+                            grid: { drawOnChartArea: false },
+                            ticks: {
+                                color: '#f59e0b',
+                                callback: value => `$${Number(value).toLocaleString()}`
+                            },
+                            title: { display: true, text: 'Costo USD', color: '#f59e0b' }
+                        }
+                    }
+                }
+            });
         }
 
         function renderTrendChart(data) {
@@ -430,7 +592,7 @@ async function verificarLogin() {
                         if (!elements.length) return;
                         const selected = sorted[elements[0].index];
                         if (!selected || selected[1] <= 0) return;
-                        showDayInCountryChart(selected[0]);
+                        showDayInAnalytics(selected[0]);
                     },
                     onHover: (event, elements) => {
                         if (event.native?.target) {
