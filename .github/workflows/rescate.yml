@@ -1,28 +1,44 @@
 name: Rescate de Datos Manual
+
 on:
-  workflow_dispatch: # Esto crea el botón "Run workflow" en GitHub
+  workflow_dispatch:
+    inputs:
+      dias:
+        description: "Fechas a rescatar separadas por coma. Ej: 2026-06-20,2026-06-21. Si se deja vacio, detecta huecos recientes."
+        required: false
+        default: ""
+
+permissions:
+  contents: write
 
 jobs:
   rescue-data:
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v3
+
       - name: Setup Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.10'
+
       - name: Instalar dependencias
-        run: pip install pandas openpyxl requests beautifulsoup4
+        run: pip install pandas openpyxl requests beautifulsoup4 lxml
+
       - name: Ejecutar script de rescate
         env:
           SMS_USER: ${{ secrets.SMS_USER }}
           SMS_PASS: ${{ secrets.SMS_PASS }}
+          DIAS_FALTANTES: ${{ github.event.inputs.dias }}
+          RESCUE_LOOKBACK_DAYS: 14
         run: python recuperar_datos.py
+
       - name: Guardar en GitHub
         run: |
           git config --global user.name 'Bot de Rescate'
           git config --global user.email 'bot@github.com'
           git add datos/reporte_actual.xlsx
-          git commit -m "🚑 Rescate manual de datos faltantes" || echo "Sin cambios"
+          git commit -m "Rescate manual de datos faltantes" || echo "Sin cambios"
           git pull --rebase origin main
           git push origin main

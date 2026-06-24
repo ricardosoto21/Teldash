@@ -177,11 +177,13 @@ Actualizacion diaria del historico.
 Responsabilidades:
 
 - Login contra servidor SMS.
-- Descarga del reporte del dia anterior.
+- Descarga una ventana reciente de dias, no solo el dia anterior.
+- Por defecto procesa `BACKFILL_DAYS=7` para recuperar automaticamente huecos cortos si el bot estuvo caido.
 - Normalizacion de columnas.
 - Conversion de costos a USD.
 - Agrupacion por dimensiones oficiales.
-- Reemplazo seguro del dia actualizado en `reporte_actual.xlsx`.
+- Reemplazo seguro de los dias que fueron descargados correctamente en `reporte_actual.xlsx`.
+- Los dias con error quedan pendientes y se reintentan en el siguiente backfill.
 
 ### `update_live.py`
 
@@ -193,6 +195,7 @@ Responsabilidades:
 - Descarga de trafico de las ultimas 12 horas.
 - Ordena por `SubmitDate`.
 - Guarda `datos/live_traffic.xlsx`.
+- Si no hay trafico en la ventana live, guarda un Excel vacio para evitar mostrar datos obsoletos.
 
 ### `importar_historico.py`
 
@@ -211,7 +214,8 @@ Rescate manual de datos faltantes.
 
 Responsabilidades:
 
-- Descargar rangos especificos.
+- Descargar dias especificos enviados por variable de entorno `DIAS_FALTANTES`.
+- Si no se entregan fechas, detecta huecos recientes en `reporte_actual.xlsx` usando `RESCUE_LOOKBACK_DAYS`.
 - Unirlos al historico existente.
 - Reagrupar para evitar duplicados.
 
@@ -224,7 +228,9 @@ Actualizacion diaria.
 - Schedule: todos los dias a las `03:01 UTC`.
 - Ejecuta `update_data.py`.
 - Usa secretos `SMS_USER` y `SMS_PASS`.
+- Define `BACKFILL_DAYS=7`.
 - Commit del nuevo `datos/reporte_actual.xlsx`.
+- Hace `git pull --rebase origin main` antes del push para reducir conflictos con otros bots.
 
 ### `.github/workflows/live_worker.yml`
 
@@ -247,6 +253,8 @@ Importacion historica manual.
 Rescate manual.
 
 - Solo `workflow_dispatch`.
+- Permite ingresar fechas separadas por coma en el input `dias`.
+- Si `dias` queda vacio, `recuperar_datos.py` detecta huecos recientes automaticamente.
 - Ejecuta `recuperar_datos.py`.
 - Actualiza `datos/reporte_actual.xlsx`.
 
