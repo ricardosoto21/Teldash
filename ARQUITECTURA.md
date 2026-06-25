@@ -180,6 +180,7 @@ Responsabilidades:
 - Descarga una ventana reciente de dias, no solo el dia anterior.
 - Por defecto procesa `BACKFILL_DAYS=7` para recuperar automaticamente huecos cortos si el bot estuvo caido.
 - Normalizacion de columnas.
+- Exclusion de filas sin pais real antes de agrupar, para evitar destinos `N/A`.
 - Conversion de costos a USD.
 - Agrupacion por dimensiones oficiales.
 - Reemplazo seguro de los dias que fueron descargados correctamente en `reporte_actual.xlsx`.

@@ -54,6 +54,8 @@ RENOMBRAMIENTOS = {
     "TerminationCurrency": "TerminationCurrencyCode",
 }
 
+PAISES_INVALIDOS = {"", "N/A", "NA", "NAN", "NONE", "NULL"}
+
 session = requests.Session()
 session.headers.update(
     {
@@ -170,6 +172,22 @@ def preparar_resumen_dia(df, fecha):
         return pd.DataFrame(columns=DIMENSIONES + list(METRICAS.keys()))
 
     df = df.rename(columns=RENOMBRAMIENTOS)
+    if "CountryRealName" not in df.columns:
+        df["CountryRealName"] = pd.NA
+
+    pais = df["CountryRealName"]
+    pais_normalizado = pais.astype("string").str.strip()
+    pais_invalido = pais.isna() | pais_normalizado.str.upper().isin(PAISES_INVALIDOS)
+    filas_sin_pais = int(pais_invalido.sum())
+    if filas_sin_pais:
+        print(f"{fecha_str}: {filas_sin_pais} filas sin pais real fueron excluidas del historico.")
+        df = df[~pais_invalido].copy()
+
+    if df.empty:
+        print(f"{fecha_str}: no quedaron filas con pais real despues de limpiar el reporte.")
+        return pd.DataFrame(columns=DIMENSIONES + list(METRICAS.keys()))
+
+    df["CountryRealName"] = df["CountryRealName"].astype("string").str.strip().astype(str)
 
     if "CurrencyCode" not in df.columns:
         df["CurrencyCode"] = "USD"
@@ -199,7 +217,10 @@ def preparar_resumen_dia(df, fecha):
     for col in DIMENSIONES:
         if col not in df.columns:
             df[col] = "N/A"
-        df[col] = df[col].fillna("N/A")
+        if col == "CountryRealName":
+            df[col] = df[col].astype("string").str.strip().astype(str)
+        else:
+            df[col] = df[col].fillna("N/A")
 
     for col in METRICAS.keys():
         if col not in df.columns:
