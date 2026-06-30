@@ -8,13 +8,66 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 
     <style>
-        body { font-family: 'Inter', sans-serif; background-color: #f0f2f5; color: #1c1e21; }
-        .header-bg { background: linear-gradient(135deg, #1e3c72, #2a5298); color: white; padding: 40px 0 30px; margin-bottom: 30px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        body {
+            font-family: 'Inter', sans-serif;
+            background:
+                linear-gradient(140deg, #f8fafc 0%, #eef4ff 48%, #e8f7f3 100%);
+            color: #1c1e21;
+            min-height: 100vh;
+        }
+        .header-bg {
+            position: relative;
+            background:
+                linear-gradient(135deg, rgba(30, 60, 114, 0.94), rgba(42, 82, 152, 0.88));
+            color: white;
+            padding: 42px 0 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 18px 45px rgba(15, 23, 42, 0.18);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+        }
+        .btn-back-dashboard {
+            position: absolute;
+            top: 18px;
+            right: 24px;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            color: #eff6ff;
+            text-decoration: none;
+            font-size: 0.85rem;
+            font-weight: 800;
+            padding: 9px 14px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.14);
+            border: 1px solid rgba(255, 255, 255, 0.26);
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.20);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+        }
+        .btn-back-dashboard:hover { color: white; background: rgba(255, 255, 255, 0.22); }
 
-        .country-card { transition: transform 0.2s, box-shadow 0.2s; border: none; border-radius: 12px; overflow: hidden; }
-        .country-card:hover { transform: translateY(-5px); box-shadow: 0 10px 20px rgba(0,0,0,0.1) !important; }
+        .country-card {
+            transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+            border: 1px solid rgba(148, 163, 184, 0.20) !important;
+            border-radius: 12px;
+            overflow: hidden;
+            background: rgba(255, 255, 255, 0.74) !important;
+            box-shadow: 0 14px 35px rgba(15, 23, 42, 0.08), inset 0 1px 0 rgba(255,255,255,0.70) !important;
+            backdrop-filter: blur(16px) saturate(135%);
+            -webkit-backdrop-filter: blur(16px) saturate(135%);
+        }
+        .country-card:hover { transform: translateY(-5px); box-shadow: 0 18px 42px rgba(30, 64, 175, 0.14) !important; border-color: rgba(59, 130, 246, 0.26) !important; }
         .card-title { font-weight: 800; font-size: 1.2rem; color: #333; }
-        .search-box { border-radius: 20px; padding: 10px 20px; border: 1px solid #ddd; }
+        .search-box {
+            border-radius: 20px;
+            padding: 10px 20px;
+            border: 1px solid rgba(148, 163, 184, 0.28);
+            background: rgba(255, 255, 255, 0.76);
+            box-shadow: 0 12px 26px rgba(15, 23, 42, 0.06), inset 0 1px 0 rgba(255,255,255,0.75);
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+        }
 
         .btn-action { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; padding: 8px; border-radius: 8px; transition: 0.2s; }
         .btn-prov { color: #4b5563; border: 1px solid #d1d5db; background: #f9fafb; }
@@ -23,20 +76,51 @@
         .btn-sale:hover { background: #e0e7ff; color: #312e81; }
         .btn-live { color: #991b1b; border: 1px solid #fecaca; background: #fef2f2; }
 
-        .modal-header-prov { background-color: #f3f4f6; border-bottom: 2px solid #e5e7eb; }
-        .modal-header-sale { background-color: #eef2ff; border-bottom: 2px solid #c7d2fe; color: #312e81; }
+        .modal-content {
+            border: 1px solid rgba(148, 163, 184, 0.26);
+            border-radius: 12px;
+            overflow: hidden;
+            background: rgba(255,255,255,0.90);
+            box-shadow: 0 20px 55px rgba(15, 23, 42, 0.22);
+            backdrop-filter: blur(18px);
+            -webkit-backdrop-filter: blur(18px);
+        }
+        .modal-header-prov { background-color: rgba(243, 244, 246, 0.86); border-bottom: 2px solid rgba(229, 231, 235, 0.75); }
+        .modal-header-sale { background-color: rgba(238, 242, 255, 0.88); border-bottom: 2px solid rgba(199, 210, 254, 0.75); color: #312e81; }
         .table-details th { font-size: 0.75rem; text-transform: uppercase; color: #6b7280; background: #f9fafb; }
 
         .live-modal { display: none; position: fixed; z-index: 9999; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); backdrop-filter: blur(5px); }
-        .live-modal-content { background: #1e293b; margin: 3% auto; padding: 25px; width: 95%; max-width: 1200px; border-radius: 15px; position: relative; color: #f8fafc; }
+        .live-modal-content {
+            background: rgba(30, 41, 59, 0.82);
+            margin: 3% auto;
+            padding: 25px;
+            width: 95%;
+            max-width: 1200px;
+            border-radius: 15px;
+            border: 1px solid rgba(148, 163, 184, 0.25);
+            position: relative;
+            color: #f8fafc;
+            box-shadow: 0 24px 70px rgba(2, 8, 23, 0.45), inset 0 1px 0 rgba(255,255,255,0.10);
+            backdrop-filter: blur(18px);
+            -webkit-backdrop-filter: blur(18px);
+        }
         .close-live { position: absolute; top: 15px; right: 20px; color: #ef4444; font-size: 30px; cursor: pointer; }
         .live-table-container { margin-top: 20px; max-height: 500px; overflow-y: auto; }
         .live-table-container table { width: 100%; color: #f8fafc; font-size: 13px; }
+        @media (max-width: 640px) {
+            .btn-back-dashboard {
+                position: static;
+                margin: 0 auto 18px;
+                width: fit-content;
+            }
+            .header-bg { padding-top: 24px; }
+        }
     </style>
 </head>
 <body>
 
 <div class="header-bg text-center">
+    <a href="index.html" class="btn-back-dashboard">Volver al dashboard</a>
     <div class="container">
         <h1 class="fw-bold">🌍 Teldash: Panel de Gestión</h1>
         <p class="lead opacity-75">Control de Costos y Precios de Venta</p>
@@ -157,6 +241,49 @@
     let tasaEUR_USD = 1.08;
     let tasaUSD_EUR = 1 / 1.08;
 
+    const COUNTRY_ISO_ALIASES = {
+        "argentina": "ar", "bolivia": "bo", "brazil": "br", "brasil": "br", "chile": "cl",
+        "colombia": "co", "costa rica": "cr", "dominican republic": "do", "republica dominicana": "do",
+        "ecuador": "ec", "el salvador": "sv", "guatemala": "gt", "honduras": "hn", "mexico": "mx",
+        "nicaragua": "ni", "panama": "pa", "paraguay": "py", "peru": "pe", "puerto rico": "pr",
+        "uruguay": "uy", "venezuela": "ve", "usa": "us", "united states": "us",
+        "united states of america": "us", "estados unidos": "us", "uk": "gb", "united kingdom": "gb",
+        "great britain": "gb", "england": "gb", "spain": "es", "espana": "es", "france": "fr",
+        "francia": "fr", "germany": "de", "alemania": "de", "italy": "it", "italia": "it",
+        "portugal": "pt", "netherlands": "nl", "holanda": "nl", "turkey": "tr", "turkiye": "tr",
+        "russia": "ru", "south korea": "kr", "korea republic": "kr", "republic of korea": "kr",
+        "north korea": "kp", "vietnam": "vn", "viet nam": "vn", "iran": "ir", "syria": "sy",
+        "uae": "ae", "united arab emirates": "ae", "emiratos arabes unidos": "ae",
+        "saudi arabia": "sa", "arabia saudita": "sa", "ivory coast": "ci", "cote d ivoire": "ci", "cote divoire": "ci",
+        "tanzania": "tz", "moldova": "md", "czech republic": "cz", "czechia": "cz",
+        "palestine": "ps", "hong kong": "hk", "macau": "mo", "macao": "mo", "taiwan": "tw",
+        "laos": "la", "kosovo": "xk"
+    };
+
+    function normalizeCountryKey(value) {
+        return String(value || '')
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .replace(/['’`]/g, '')
+            .replace(/&/g, ' and ')
+            .replace(/[^a-zA-Z0-9]+/g, ' ')
+            .trim()
+            .toLowerCase();
+    }
+
+    function addCountryIsoAlias(name, iso) {
+        const key = normalizeCountryKey(name);
+        if (key && iso) banderasISO[key] = String(iso).toLowerCase();
+    }
+
+    function seedCountryAliases() {
+        Object.entries(COUNTRY_ISO_ALIASES).forEach(([name, iso]) => addCountryIsoAlias(name, iso));
+    }
+
+    function getCountryIso(nombre) {
+        return banderasISO[normalizeCountryKey(nombre)] || '';
+    }
+
     function pickField(row, fields, fallback = '') {
         for (const field of fields) {
             const value = row?.[field];
@@ -228,7 +355,7 @@
 $(document).ready(function() {
         Promise.all([
             // Protegemos la API de banderas
-            fetch('https://restcountries.com/v3.1/all?fields=name,cca2').then(r => r.ok ? r.json() : []).catch(() => []),
+            fetch('https://restcountries.com/v3.1/all?fields=name,cca2,translations,altSpellings').then(r => r.ok ? r.json() : []).catch(() => []),
 
             // API Principal de Google
             fetch(API_URL).then(r => r.json()).catch(e => null),
@@ -258,10 +385,15 @@ $(document).ready(function() {
                 // 3. Mapeo de banderas
                 if (Array.isArray(paisesMundo)) {
                     paisesMundo.forEach(p => {
-                        if(p.name && p.name.common && p.cca2) banderasISO[p.name.common.toLowerCase()] = p.cca2.toLowerCase();
+                        if (!p.cca2) return;
+                        addCountryIsoAlias(p.name?.common, p.cca2);
+                        addCountryIsoAlias(p.name?.official, p.cca2);
+                        addCountryIsoAlias(p.translations?.spa?.common, p.cca2);
+                        addCountryIsoAlias(p.translations?.spa?.official, p.cca2);
+                        (p.altSpellings || []).forEach(alias => addCountryIsoAlias(alias, p.cca2));
                     });
                 }
-                banderasISO["usa"] = "us"; banderasISO["uk"] = "gb";
+                seedCountryAliases();
 
                 // 4. Mapeo Live Traffic (Protegido contra Excel corruptos o 404)
                 if (bufferLive) {
@@ -474,8 +606,10 @@ $(document).ready(function() {
         paises.forEach(nombre => {
             const info = globalData[nombre] || { nombre, proveedores: new Set(), rutas: [] };
             const ventas = globalSalesData[nombre]?.rutas?.length || 0;
-            const codigoIso = banderasISO[nombre.toLowerCase().trim()];
-            const flag = codigoIso ? `<img src="https://flagcdn.com/w40/${codigoIso}.png" width="40" class="mb-3 rounded shadow-sm">` : '🌐';
+            const codigoIso = getCountryIso(nombre);
+            const flag = codigoIso
+                ? `<img src="https://flagcdn.com/w40/${codigoIso}.png" width="40" height="30" loading="lazy" alt="Bandera ${escapeAttr(nombre)}" class="mb-3 rounded shadow-sm" onerror="this.replaceWith(document.createTextNode('🌐'))">`
+                : '🌐';
             const live = trafficVolumes[nombre] ? `<div class="mb-2 text-danger fw-bold" style="font-size: 11px;">🔥 ${trafficVolumes[nombre]} SMS</div>` : '';
             const proveedoresTexto = `${info.proveedores.size} Proveedores`;
             const ventasTexto = ventas ? `<div class="badge bg-light text-dark border mb-3 ms-1">${ventas} Ventas</div>` : '';

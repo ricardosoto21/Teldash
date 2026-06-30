@@ -7,49 +7,91 @@
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        :root { --bg: #0f172a; --surface: #1e293b; --primary: #6366f1; --success: #10b981; --warning: #f59e0b; --danger: #ef4444; --text: #f8fafc; --border: #334155; }
+        :root {
+            --bg: #0f172a;
+            --surface: rgba(30, 41, 59, 0.68);
+            --surface-strong: rgba(15, 23, 42, 0.82);
+            --primary: #7dd3fc;
+            --success: #34d399;
+            --warning: #fbbf24;
+            --danger: #fb7185;
+            --text: #f8fafc;
+            --muted: #a8b3c7;
+            --border: rgba(148, 163, 184, 0.22);
+            --glass-highlight: rgba(255, 255, 255, 0.12);
+        }
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', sans-serif; }
-        body { background: var(--bg); color: var(--text); padding: 24px; }
-        .card { background: var(--surface); border-radius: 12px; border: 1px solid var(--border); padding: 20px; margin-bottom: 24px; }
+        body {
+            min-height: 100vh;
+            background:
+                linear-gradient(140deg, #0f172a 0%, #111827 44%, #10231f 100%);
+            color: var(--text);
+            padding: 24px;
+        }
+        .card {
+            background:
+                linear-gradient(145deg, rgba(255,255,255,0.10), rgba(255,255,255,0.035)),
+                var(--surface);
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            box-shadow: 0 18px 45px rgba(2, 8, 23, 0.28), inset 0 1px 0 var(--glass-highlight);
+            backdrop-filter: blur(18px) saturate(138%);
+            -webkit-backdrop-filter: blur(18px) saturate(138%);
+            padding: 20px;
+            margin-bottom: 24px;
+        }
         .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 32px; }
+        .header h1 { letter-spacing: 0; }
+        .header p { color: var(--muted) !important; }
         .filter-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 16px; margin-bottom: 24px; }
-        .input-group label { display: block; font-size: 11px; color: #94a3b8; text-transform: uppercase; margin-bottom: 8px; font-weight: 700; }
-        select, input { width: 100%; background: #0f172a; border: 1px solid var(--border); color: white; padding: 10px; border-radius: 8px; outline: none; transition: border-color 0.2s; }
-        select:focus, input:focus { border-color: var(--primary); }
+        .input-group label { display: block; font-size: 11px; color: var(--muted); text-transform: uppercase; margin-bottom: 8px; font-weight: 700; }
+        select, input {
+            width: 100%;
+            background: rgba(15, 23, 42, 0.72);
+            border: 1px solid var(--border);
+            color: white;
+            padding: 10px;
+            border-radius: 8px;
+            outline: none;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.06);
+            transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
+        }
+        select:focus, input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(125, 211, 252, 0.16), inset 0 1px 0 rgba(255,255,255,0.08); }
         .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; margin-bottom: 32px; }
         .kpi-card { padding: 24px; border-left: 4px solid var(--primary); }
-        .kpi-label { font-size: 12px; color: #94a3b8; text-transform: uppercase; margin-bottom: 8px; font-weight: 600; }
+        .kpi-label { font-size: 12px; color: var(--muted); text-transform: uppercase; margin-bottom: 8px; font-weight: 600; }
         .kpi-value { font-size: 28px; font-weight: 700; }
         .charts-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(450px, 1fr)); gap: 24px; margin-bottom: 32px; }
         .chart-header { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 12px; }
         .chart-header h3 { margin: 0; }
         .chart-control { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
-        .chart-control label { font-size: 11px; color: #94a3b8; text-transform: uppercase; font-weight: 700; }
+        .chart-control label { font-size: 11px; color: var(--muted); text-transform: uppercase; font-weight: 700; }
         .chart-control select { width: auto; min-width: 120px; padding: 8px 10px; }
-        .chart-reset { background: transparent; color: #a5b4fc; border: 1px solid #6366f1; padding: 7px 10px; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 600; }
-        .chart-reset:hover { background: rgba(99, 102, 241, 0.15); color: white; }
+        .chart-reset { background: rgba(125, 211, 252, 0.10); color: #bae6fd; border: 1px solid rgba(125, 211, 252, 0.35); padding: 7px 10px; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 600; }
+        .chart-reset:hover { background: rgba(125, 211, 252, 0.18); color: white; }
         .chart-reset[hidden] { display: none; }
         .vendor-chart-scroll { overflow-x: auto; padding-bottom: 4px; }
         .vendor-chart-inner { position: relative; min-width: 100%; height: 380px; }
-        .chart-empty { display: none; min-height: 220px; align-items: center; justify-content: center; color: #94a3b8; font-size: 14px; }
+        .finance-chart-inner { position: relative; min-height: 380px; height: 380px; }
+        .chart-empty { display: none; min-height: 220px; align-items: center; justify-content: center; color: var(--muted); font-size: 14px; }
         table { width: 100%; border-collapse: collapse; }
-        th { text-align: left; padding: 12px; font-size: 11px; text-transform: uppercase; color: #94a3b8; border-bottom: 2px solid var(--border); }
+        th { text-align: left; padding: 12px; font-size: 11px; text-transform: uppercase; color: var(--muted); border-bottom: 2px solid var(--border); }
         td { padding: 14px 12px; font-size: 14px; border-bottom: 1px solid var(--border); }
-        tr:hover td { background: rgba(255,255,255,0.02); }
+        tr:hover td { background: rgba(255,255,255,0.045); }
         #status-bar { padding: 8px 16px; border-radius: 20px; font-size: 12px; font-weight: 600; }
-        .status-ok { background: rgba(16, 185, 129, 0.1); color: var(--success); }
+        .status-ok { background: rgba(52, 211, 153, 0.12); color: var(--success); border: 1px solid rgba(52, 211, 153, 0.28); }
         
         /* Estilos del Login */
         #login-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--bg); z-index: 9999; display: flex; align-items: center; justify-content: center; }
         #dashboard-content { display: none; }
-        .btn-login { background: var(--primary); color: white; border: none; padding: 12px; border-radius: 8px; width: 100%; cursor: pointer; font-weight: bold; font-size: 14px; transition: 0.2s; }
-        .btn-login:hover { background: #4f46e5; }
+        .btn-login { background: linear-gradient(135deg, #38bdf8, #34d399); color: #082f49; border: none; padding: 12px; border-radius: 8px; width: 100%; cursor: pointer; font-weight: bold; font-size: 14px; transition: 0.2s; }
+        .btn-login:hover { filter: brightness(1.08); }
 
         /* Botón de Cobertura Global */
         .btn-destinos {
-            background: rgba(99, 102, 241, 0.1);
-            color: var(--primary);
-            border: 1px solid var(--primary);
+            background: rgba(125, 211, 252, 0.12);
+            color: #bae6fd;
+            border: 1px solid rgba(125, 211, 252, 0.35);
             padding: 8px 16px;
             border-radius: 8px;
             text-decoration: none;
@@ -61,7 +103,7 @@
             gap: 8px;
         }
         .btn-destinos:hover {
-            background: var(--primary);
+            background: rgba(125, 211, 252, 0.20);
             color: white;
         }
         @media (max-width: 640px) {
@@ -70,6 +112,7 @@
             .chart-control { justify-content: space-between; }
             .chart-control select { flex: 1; min-width: 0; }
             .vendor-chart-inner { height: 340px; }
+            .finance-chart-inner { height: 340px; min-height: 340px; }
         }
     </style>
 </head>
@@ -137,6 +180,16 @@
 
         <div class="card">
             <div class="chart-header">
+                <h3 id="finance-chart-title">Volumen, ingresos y costos diarios</h3>
+            </div>
+            <div id="finance-chart-empty" class="chart-empty">No hay informacion financiera para los filtros seleccionados.</div>
+            <div class="finance-chart-inner">
+                <canvas id="chartFinanceDaily"></canvas>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="chart-header">
                 <h3 id="vendor-chart-title">Costo y SMS por vendor</h3>
                 <div class="chart-control">
                     <label for="vendor-limit">Mostrar</label>
@@ -176,7 +229,12 @@
 window.charts = charts;
         let currentDashboardData = [];
         let selectedTrendDate = '';
-        const chartColors = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#06b6d4', '#8b5cf6', '#22c55e', '#f97316', '#ec4899', '#94a3b8'];
+        const chartColors = ['#5eead4', '#fbbf24', '#fb7185', '#a78bfa', '#38bdf8', '#34d399', '#f97316', '#c084fc', '#2dd4bf', '#f472b6'];
+        const financeColors = {
+            sms: { normal: 'rgba(56, 189, 248, 0.76)', dim: 'rgba(56, 189, 248, 0.28)', border: '#7dd3fc' },
+            revenue: { normal: 'rgba(52, 211, 153, 0.76)', dim: 'rgba(52, 211, 153, 0.28)', border: '#86efac' },
+            cost: { normal: 'rgba(251, 113, 133, 0.76)', dim: 'rgba(251, 113, 133, 0.28)', border: '#fda4af' }
+        };
 
         // 1. SISTEMA DE LOGIN
         window.addEventListener('DOMContentLoaded', () => {
@@ -263,7 +321,9 @@ async function verificarLogin() {
         }
 
         function updateTrendChart() {
-            renderTrendChart(getFilteredData({ includeDateRange: true }));
+            const filtered = getFilteredData({ includeDateRange: true });
+            renderTrendChart(filtered);
+            renderFinanceChart(filtered);
         }
 
         function updateVendorChart() {
@@ -347,6 +407,54 @@ async function verificarLogin() {
             return keys;
         }
 
+        function isBlankOrNA(value) {
+            const text = String(value ?? '').trim().toUpperCase();
+            return !text || text === 'N/A' || text === 'NA' || text === 'NAN' || text === 'NULL';
+        }
+
+        function getVendorName(value) {
+            const rawName = String(value ?? '').trim();
+            return isBlankOrNA(rawName) ? 'Sin vendor' : rawName;
+        }
+
+        function formatUsd(value) {
+            return `$${Number(value || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+        }
+
+        function getSelectedBarColors(labels, palette) {
+            return labels.map(label => !selectedTrendDate || label === selectedTrendDate ? palette.normal : palette.dim);
+        }
+
+        function getSelectedBorderColors(labels, palette) {
+            return labels.map(label => label === selectedTrendDate ? '#fbbf24' : palette.border);
+        }
+
+        function getSelectedBorderWidths(labels) {
+            return labels.map(label => label === selectedTrendDate ? 2 : 1);
+        }
+
+        function getDailyMetrics(data) {
+            const daily = {};
+            data.forEach(d => {
+                const dateKey = d.SubmitDateKey || normalizeDateKey(d.SubmitDate);
+                if (!dateKey) return;
+                if (!daily[dateKey]) daily[dateKey] = { volume: 0, revenue: 0, cost: 0 };
+                daily[dateKey].volume += Number(d.MessageParts) || 0;
+                daily[dateKey].revenue += Number(d.ClientCostUSD) || 0;
+                daily[dateKey].cost += Number(d.TerminationCostUSD) || 0;
+            });
+            return daily;
+        }
+
+        function getVisibleDailyRange(daily, days) {
+            const dateKeys = Object.keys(daily).sort();
+            const end = dateKeys[dateKeys.length - 1];
+            const start = end ? shiftDateKey(end, -(days - 1)) : '';
+            return start && end
+                ? getDateRangeKeys(start, end).map(dateKey => [dateKey, daily[dateKey] || { volume: 0, revenue: 0, cost: 0 }])
+                : [];
+        }
+
         function renderDashboard(data, trendData = data) {
             const totalVol = data.reduce((s, d) => s + (Number(d.MessageParts) || 0), 0);
             const totalRev = data.reduce((s, d) => s + (Number(d.ClientCostUSD) || 0), 0);
@@ -373,13 +481,30 @@ async function verificarLogin() {
         function renderCharts(data, trendData = data) {
             renderCountryChart(data);
             renderTrendChart(trendData);
+            renderFinanceChart(trendData);
             renderVendorChart(data);
         }
 
         function renderCountryChart(data, dateKey = '') {
             const countries = {};
-            data.forEach(d => { if(d.CountryRealName) countries[d.CountryRealName] = (countries[d.CountryRealName] || 0) + (Number(d.MessageParts) || 0); });
-            const top = Object.entries(countries).sort((a,b) => b[1]-a[1]).slice(0,10);
+            data.forEach(d => {
+                const countryName = String(d.CountryRealName ?? '').trim();
+                if (isBlankOrNA(countryName)) return;
+
+                const volume = Number(d.MessageParts) || 0;
+                const vendorName = getVendorName(d.VendorAccountName);
+                if (!countries[countryName]) countries[countryName] = { volume: 0, vendors: {} };
+                countries[countryName].volume += volume;
+                countries[countryName].vendors[vendorName] = (countries[countryName].vendors[vendorName] || 0) + volume;
+            });
+            const top = Object.entries(countries)
+                .map(([name, values]) => ({
+                    name,
+                    volume: values.volume,
+                    vendors: Object.entries(values.vendors).sort((a, b) => b[1] - a[1]).map(([vendor, total]) => ({ vendor, total }))
+                }))
+                .sort((a,b) => b.volume - a.volume)
+                .slice(0,10);
             const title = document.getElementById('country-chart-title');
             const resetButton = document.getElementById('reset-country-chart');
 
@@ -391,7 +516,18 @@ async function verificarLogin() {
             if(charts.c) charts.c.destroy();
             charts.c = new Chart(document.getElementById('chartCountry'), {
                 type: 'pie',
-                data: { labels: top.map(x=>x[0]), datasets: [{ label: 'SMS Parts', data: top.map(x=>x[1]), backgroundColor: chartColors, borderColor: '#1e293b', borderWidth: 2 }] },
+                data: {
+                    labels: top.map(x => x.name),
+                    datasets: [{
+                        label: 'SMS Parts',
+                        data: top.map(x => x.volume),
+                        vendorBreakdown: top.map(x => x.vendors),
+                        backgroundColor: chartColors,
+                        borderColor: 'rgba(15, 23, 42, 0.72)',
+                        hoverBorderColor: '#f8fafc',
+                        borderWidth: 2
+                    }]
+                },
                 options: {
                     responsive: true,
                     plugins: {
@@ -403,6 +539,13 @@ async function verificarLogin() {
                                     const total = ctx.dataset.data.reduce((sum, item) => sum + Number(item || 0), 0);
                                     const pct = total > 0 ? ` (${(value / total * 100).toFixed(1)}%)` : '';
                                     return `${ctx.label}: ${value.toLocaleString()}${pct}`;
+                                },
+                                afterLabel: (ctx) => {
+                                    const vendors = ctx.dataset.vendorBreakdown?.[ctx.dataIndex] || [];
+                                    if (!vendors.length) return [];
+                                    const topVendors = vendors.slice(0, 5).map(item => `${item.vendor}: ${Number(item.total || 0).toLocaleString()} SMS`);
+                                    if (vendors.length > 5) topVendors.push(`+${vendors.length - 5} mas`);
+                                    return ['Vendors:', ...topVendors];
                                 }
                             }
                         }
@@ -427,28 +570,165 @@ async function verificarLogin() {
             renderCountryChart(dayData, dateKey);
             renderVendorChart(dayData, dateKey);
             highlightTrendDate(dateKey);
+            highlightFinanceDate(dateKey);
         }
 
         function resetCountryChart() {
             selectedTrendDate = '';
             renderCountryChart(currentDashboardData);
             renderVendorChart(currentDashboardData);
+            renderFinanceChart(currentDashboardData);
             highlightTrendDate('');
         }
 
         function highlightTrendDate(dateKey) {
             if (!charts.t) return;
             charts.t.data.datasets[0].backgroundColor = charts.t.data.labels.map(label => {
-                return label === dateKey ? '#f59e0b' : '#10b981';
+                return label === dateKey ? '#fbbf24' : 'rgba(52, 211, 153, 0.78)';
             });
             charts.t.update();
+        }
+
+        function highlightFinanceDate(dateKey) {
+            const title = document.getElementById('finance-chart-title');
+            if (title) {
+                title.textContent = dateKey
+                    ? `Volumen, ingresos y costos diarios - ${dateKey}`
+                    : 'Volumen, ingresos y costos diarios';
+            }
+            if (!charts.f) return;
+            const labels = charts.f.data.labels;
+            charts.f.data.datasets.forEach(dataset => {
+                const palette = financeColors[dataset.metricKey];
+                if (!palette) return;
+                dataset.backgroundColor = getSelectedBarColors(labels, palette);
+                dataset.borderColor = getSelectedBorderColors(labels, palette);
+                dataset.borderWidth = getSelectedBorderWidths(labels);
+            });
+            charts.f.update();
+        }
+
+        function renderFinanceChart(data) {
+            const daily = getDailyMetrics(data);
+            const days = Number(document.getElementById('trend-days').value) || 7;
+            const sorted = getVisibleDailyRange(daily, days);
+            const labels = sorted.map(x => x[0]);
+            const title = document.getElementById('finance-chart-title');
+            const emptyState = document.getElementById('finance-chart-empty');
+            const chartContainer = document.querySelector('.finance-chart-inner');
+
+            if (title) {
+                title.textContent = selectedTrendDate
+                    ? `Volumen, ingresos y costos diarios - ${selectedTrendDate}`
+                    : 'Volumen, ingresos y costos diarios';
+            }
+
+            if (charts.f) {
+                charts.f.destroy();
+                charts.f = null;
+            }
+
+            if (!sorted.length) {
+                emptyState.style.display = 'flex';
+                chartContainer.style.display = 'none';
+                return;
+            }
+
+            emptyState.style.display = 'none';
+            chartContainer.style.display = 'block';
+
+            charts.f = new Chart(document.getElementById('chartFinanceDaily'), {
+                type: 'bar',
+                data: {
+                    labels,
+                    datasets: [
+                        {
+                            label: 'SMS enviados',
+                            metricKey: 'sms',
+                            data: sorted.map(([, values]) => values.volume),
+                            backgroundColor: getSelectedBarColors(labels, financeColors.sms),
+                            borderColor: getSelectedBorderColors(labels, financeColors.sms),
+                            borderWidth: getSelectedBorderWidths(labels),
+                            borderRadius: 6,
+                            yAxisID: 'ySms'
+                        },
+                        {
+                            label: 'Ingresos USD',
+                            metricKey: 'revenue',
+                            data: sorted.map(([, values]) => values.revenue),
+                            backgroundColor: getSelectedBarColors(labels, financeColors.revenue),
+                            borderColor: getSelectedBorderColors(labels, financeColors.revenue),
+                            borderWidth: getSelectedBorderWidths(labels),
+                            borderRadius: 6,
+                            yAxisID: 'yMoney'
+                        },
+                        {
+                            label: 'Costos USD',
+                            metricKey: 'cost',
+                            data: sorted.map(([, values]) => values.cost),
+                            backgroundColor: getSelectedBarColors(labels, financeColors.cost),
+                            borderColor: getSelectedBorderColors(labels, financeColors.cost),
+                            borderWidth: getSelectedBorderWidths(labels),
+                            borderRadius: 6,
+                            yAxisID: 'yMoney'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    onClick: (event, elements) => {
+                        if (!elements.length) return;
+                        const selected = sorted[elements[0].index];
+                        if (!selected || (selected[1].volume <= 0 && selected[1].revenue <= 0 && selected[1].cost <= 0)) return;
+                        showDayInAnalytics(selected[0]);
+                    },
+                    onHover: (event, elements) => {
+                        if (event.native?.target) {
+                            event.native.target.style.cursor = elements.length ? 'pointer' : 'default';
+                        }
+                    },
+                    plugins: {
+                        legend: { labels: { color: '#f8fafc', boxWidth: 12, padding: 16 } },
+                        tooltip: {
+                            callbacks: {
+                                label: (ctx) => ctx.dataset.yAxisID === 'yMoney'
+                                    ? `${ctx.dataset.label}: ${formatUsd(ctx.raw)}`
+                                    : `${ctx.dataset.label}: ${Number(ctx.raw || 0).toLocaleString()}`
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: { display: false },
+                            ticks: { color: '#a8b3c7' }
+                        },
+                        ySms: {
+                            type: 'linear',
+                            position: 'left',
+                            beginAtZero: true,
+                            grid: { color: 'rgba(148, 163, 184, 0.18)' },
+                            ticks: { color: '#a8b3c7' },
+                            title: { display: true, text: 'SMS enviados', color: '#a8b3c7' }
+                        },
+                        yMoney: {
+                            type: 'linear',
+                            position: 'right',
+                            beginAtZero: true,
+                            grid: { drawOnChartArea: false },
+                            ticks: { color: '#fbbf24', callback: value => `$${Number(value).toLocaleString()}` },
+                            title: { display: true, text: 'USD', color: '#fbbf24' }
+                        }
+                    }
+                }
+            });
         }
 
         function renderVendorChart(data, dateKey = selectedTrendDate) {
             const vendors = {};
             data.forEach(d => {
-                const rawName = String(d.VendorAccountName ?? '').trim();
-                const vendorName = !rawName || rawName.toUpperCase() === 'N/A' ? 'Sin vendor' : rawName;
+                const vendorName = getVendorName(d.VendorAccountName);
 
                 if (!vendors[vendorName]) vendors[vendorName] = { volume: 0, cost: 0 };
                 vendors[vendorName].volume += Number(d.MessageParts) || 0;
@@ -498,7 +778,9 @@ async function verificarLogin() {
                             type: 'bar',
                             label: 'SMS enviados',
                             data: selectedVendors.map(([, values]) => values.volume),
-                            backgroundColor: '#6366f1',
+                            backgroundColor: 'rgba(56, 189, 248, 0.72)',
+                            borderColor: '#7dd3fc',
+                            borderWidth: 1,
                             borderRadius: 6,
                             yAxisID: 'ySms',
                             order: 2
@@ -507,8 +789,8 @@ async function verificarLogin() {
                             type: 'line',
                             label: 'Costo USD',
                             data: selectedVendors.map(([, values]) => values.cost),
-                            borderColor: '#f59e0b',
-                            backgroundColor: '#f59e0b',
+                            borderColor: '#fbbf24',
+                            backgroundColor: '#fbbf24',
                             borderWidth: 3,
                             pointRadius: 4,
                             pointHoverRadius: 6,
@@ -527,7 +809,7 @@ async function verificarLogin() {
                         tooltip: {
                             callbacks: {
                                 label: (ctx) => ctx.dataset.yAxisID === 'yCost'
-                                    ? `${ctx.dataset.label}: $${Number(ctx.raw || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                                    ? `${ctx.dataset.label}: ${formatUsd(ctx.raw)}`
                                     : `${ctx.dataset.label}: ${Number(ctx.raw || 0).toLocaleString()}`
                             }
                         }
@@ -535,15 +817,15 @@ async function verificarLogin() {
                     scales: {
                         x: {
                             grid: { display: false },
-                            ticks: { color: '#94a3b8', maxRotation: 45, minRotation: 0 }
+                            ticks: { color: '#a8b3c7', maxRotation: 45, minRotation: 0 }
                         },
                         ySms: {
                             type: 'linear',
                             position: 'left',
                             beginAtZero: true,
-                            grid: { color: '#334155' },
-                            ticks: { color: '#94a3b8' },
-                            title: { display: true, text: 'SMS enviados', color: '#94a3b8' }
+                            grid: { color: 'rgba(148, 163, 184, 0.18)' },
+                            ticks: { color: '#a8b3c7' },
+                            title: { display: true, text: 'SMS enviados', color: '#a8b3c7' }
                         },
                         yCost: {
                             type: 'linear',
@@ -551,10 +833,10 @@ async function verificarLogin() {
                             beginAtZero: true,
                             grid: { drawOnChartArea: false },
                             ticks: {
-                                color: '#f59e0b',
+                                color: '#fbbf24',
                                 callback: value => `$${Number(value).toLocaleString()}`
                             },
-                            title: { display: true, text: 'Costo USD', color: '#f59e0b' }
+                            title: { display: true, text: 'Costo USD', color: '#fbbf24' }
                         }
                     }
                 }
@@ -583,7 +865,9 @@ async function verificarLogin() {
                     datasets: [{
                         label: 'Volumen Diario',
                         data: sorted.map(x=>x[1]),
-                        backgroundColor: sorted.map(x => x[0] === selectedTrendDate ? '#f59e0b' : '#10b981'),
+                        backgroundColor: sorted.map(x => x[0] === selectedTrendDate ? '#fbbf24' : 'rgba(52, 211, 153, 0.78)'),
+                        borderColor: sorted.map(x => x[0] === selectedTrendDate ? '#fde68a' : '#86efac'),
+                        borderWidth: 1,
                         borderRadius: 6
                     }]
                 },
@@ -601,8 +885,8 @@ async function verificarLogin() {
                     },
                     plugins: { legend: { display: false } },
                     scales: {
-                        x: { grid: { display: false }, ticks: { color: '#94a3b8' } },
-                        y: { beginAtZero: true, grid: { color: '#334155' }, ticks: { color: '#94a3b8' } }
+                        x: { grid: { display: false }, ticks: { color: '#a8b3c7' } },
+                        y: { beginAtZero: true, grid: { color: 'rgba(148, 163, 184, 0.18)' }, ticks: { color: '#a8b3c7' } }
                     }
                 }
             });

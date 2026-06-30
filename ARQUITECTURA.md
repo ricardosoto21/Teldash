@@ -87,11 +87,13 @@ Responsabilidades:
 - Filtros por fecha, cliente, pais y operador.
 - KPIs principales: mensajes, ingresos, costos, utilidad, DLR y latencia.
 - Grafico de pastel: volumen real por destino.
+- Tooltip del grafico de destino con vendors usados por pais.
 - Grafico de barras: tendencia diaria.
+- Grafico diario agrupado: `MessageParts`, `ClientCostUSD` y `TerminationCostUSD`.
 - Grafico combinado por vendor: barras de `MessageParts` y linea de `TerminationCostUSD`, ordenado por volumen y limitado mediante selector.
 - Selector independiente para ver la tendencia de los ultimos `7`, `14`, `30`, `60` o `90` dias sin modificar los otros componentes.
 - Drill-down interactivo: al seleccionar una barra diaria, los graficos de destino y vendor muestran el detalle de ese dia sin modificar KPIs, filtros ni tabla.
-- El boton `Ver total` restaura simultaneamente ambos graficos analiticos.
+- El boton `Ver total` restaura simultaneamente los graficos analiticos y elimina resaltados diarios.
 - Tabla de desglose financiero por cliente.
 
 Tecnologias usadas:
@@ -110,6 +112,7 @@ Responsabilidades:
 - Carga datos maestros desde un Google Apps Script.
 - Normaliza formato plano de tarifas y formato historico `{ costos, ventas }`.
 - Carga banderas desde `restcountries.com`.
+- Usa aliases locales pais -> ISO para mantener banderas aunque el nombre venga en espanol, abreviado o con variantes.
 - Carga tipo de cambio EUR/USD desde `open.er-api.com`.
 - Carga volumen live desde `datos/live_traffic.xlsx`.
 - Muestra tarjetas por pais con proveedores, costos, ventas y trafico reciente.
