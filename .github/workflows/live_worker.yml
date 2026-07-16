@@ -33,7 +33,7 @@ jobs:
         run: |
           git config --global user.name 'Live Monitor Bot'
           git config --global user.email 'bot@github.com'
-          git add datos/live_traffic.xlsx
+          git add datos/live_traffic.xlsx datos/live_today.xlsx
           git commit -m "Update Live Traffic [$(date)]" || echo "No changes"
           git pull --rebase origin main
           git push origin main

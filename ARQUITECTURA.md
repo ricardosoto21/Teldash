@@ -21,8 +21,10 @@ flowchart LR
     A["Servidor SMS externo"] --> B["Scripts Python ETL"]
     B --> C["datos/reporte_actual.xlsx"]
     B --> D["datos/live_traffic.xlsx"]
+    B --> L["datos/live_today.xlsx"]
     C --> E["index.html"]
     D --> F["Destinos.html / js/live_logic.js"]
+    L --> F
     G["Gmail recibidos y enviados"] --> J["Apps Script tarifas"]
     J --> K["Google Sheets tarifas"]
     K --> J
@@ -61,7 +63,8 @@ flowchart LR
 |   `-- README.md
 |-- datos/
 |   |-- reporte_actual.xlsx
-|   `-- live_traffic.xlsx
+|   |-- live_traffic.xlsx
+|   `-- live_today.xlsx
 |-- update_data.py
 |-- update_live.py
 |-- importar_historico.py
@@ -114,15 +117,18 @@ Responsabilidades:
 - Carga banderas desde `restcountries.com`.
 - Usa aliases locales pais -> ISO para mantener banderas aunque el nombre venga en espanol, abreviado o con variantes.
 - Carga tipo de cambio EUR/USD desde `open.er-api.com`.
-- Carga volumen live desde `datos/live_traffic.xlsx`.
+- Carga volumen live reciente desde `datos/live_traffic.xlsx` para tarjetas y modal de registros.
+- Carga el dashboard live del dia en curso desde `datos/live_today.xlsx`.
 - Muestra tarjetas por pais con proveedores, costos, ventas y trafico reciente.
+- Muestra un dashboard live del dia con KPIs, volumen por hora, estados DLR y top destinos.
 
 Tecnologias usadas:
 
 - HTML, CSS y JavaScript.
 - Bootstrap 5 para modales y estilos base.
+- Chart.js para graficos del dashboard live.
 - jQuery para manipulacion de DOM.
-- SheetJS para leer `live_traffic.xlsx`.
+- SheetJS para leer `live_traffic.xlsx` y `live_today.xlsx`.
 
 ### `js/live_logic.js`
 
@@ -167,7 +173,13 @@ Y metricas como:
 
 Fuente de trafico reciente para `Destinos.html` y `js/live_logic.js`.
 
-Se genera con datos de las ultimas horas y se usa para mostrar registros recientes por pais.
+Se genera con datos de las ultimas 12 horas y se usa para mostrar registros recientes por pais en las tarjetas y en el modal live.
+
+### `datos/live_today.xlsx`
+
+Fuente diaria del dashboard live de `Destinos.html`.
+
+Se genera con todos los registros del dia en curso, desde las 00:00 hasta la hora de ejecucion del bot. No reemplaza a `live_traffic.xlsx`: ambos archivos conviven para mantener intacto el comportamiento existente de ultimas 12 horas y permitir una vista agregada diaria.
 
 ## 6. Backend / ETL en Python
 
@@ -196,10 +208,12 @@ Actualizacion de trafico reciente.
 Responsabilidades:
 
 - Login contra servidor SMS.
-- Descarga de trafico de las ultimas 12 horas.
+- Descarga de trafico de las ultimas 12 horas para `datos/live_traffic.xlsx`.
+- Descarga de trafico del dia en curso para `datos/live_today.xlsx`.
 - Ordena por `SubmitDate`.
-- Guarda `datos/live_traffic.xlsx`.
-- Si no hay trafico en la ventana live, guarda un Excel vacio para evitar mostrar datos obsoletos.
+- Guarda ambos Excel.
+- Si no hay trafico en una ventana, guarda un Excel vacio para evitar mostrar datos obsoletos.
+- Si falla la descarga diaria, no bloquea la publicacion del archivo de 12 horas; publica `live_today.xlsx` vacio para que el dashboard diario no muestre informacion vieja.
 
 ### `importar_historico.py`
 
@@ -242,7 +256,7 @@ Actualizacion live.
 
 - Schedule: cada 30 minutos.
 - Ejecuta `update_live.py`.
-- Commit del nuevo `datos/live_traffic.xlsx`.
+- Commit de `datos/live_traffic.xlsx` y `datos/live_today.xlsx`.
 
 ### `.github/workflows/importar.yml`
 
@@ -357,7 +371,7 @@ Detener con `Ctrl + C` en la terminal donde corre el servidor.
 - Si cambia un formato de tarifas, actualizar su fila en `plantillas` antes de modificar el parser general.
 - Si una ruta no publica, revisar primero `errores` y luego `catalogo_rutas`.
 - Si los graficos no cargan, verificar primero que `datos/reporte_actual.xlsx` exista y sea descargable por HTTP.
-- Si el trafico live no aparece, verificar `datos/live_traffic.xlsx` y el workflow `live_worker.yml`.
+- Si el trafico live no aparece, verificar `datos/live_traffic.xlsx`, `datos/live_today.xlsx` y el workflow `live_worker.yml`.
 - Si hay errores de moneda, revisar APIs de conversion y fallback en los scripts Python.
 
 ## 13. Guia Rapida para Nuevos Colaboradores

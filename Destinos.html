@@ -6,6 +6,7 @@
     <title>Teldash - Gestión de Rutas Dual</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
     <style>
         body {
@@ -76,6 +77,135 @@
         .btn-sale:hover { background: #e0e7ff; color: #312e81; }
         .btn-live { color: #991b1b; border: 1px solid #fecaca; background: #fef2f2; }
 
+        .live-dashboard {
+            display: none;
+            margin-bottom: 28px;
+        }
+        .live-glass-card {
+            background: rgba(255, 255, 255, 0.76);
+            border: 1px solid rgba(148, 163, 184, 0.22);
+            border-radius: 12px;
+            box-shadow: 0 16px 42px rgba(15, 23, 42, 0.10), inset 0 1px 0 rgba(255,255,255,0.72);
+            backdrop-filter: blur(16px) saturate(135%);
+            -webkit-backdrop-filter: blur(16px) saturate(135%);
+        }
+        .live-dashboard-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            padding: 20px 22px 8px;
+        }
+        .live-dashboard-header h2 {
+            margin: 0;
+            color: #172554;
+            font-size: 1.35rem;
+            font-weight: 800;
+        }
+        .live-dashboard-date {
+            color: #64748b;
+            font-size: 0.85rem;
+            font-weight: 700;
+        }
+        .live-kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 14px;
+            padding: 14px 22px 20px;
+        }
+        .live-kpi {
+            min-height: 104px;
+            padding: 16px;
+            border-radius: 12px;
+            border: 1px solid rgba(148, 163, 184, 0.20);
+            background: linear-gradient(145deg, rgba(255,255,255,0.86), rgba(255,255,255,0.54));
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.76);
+        }
+        .live-kpi-label {
+            color: #64748b;
+            font-size: 0.72rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+        }
+        .live-kpi-value {
+            color: #0f172a;
+            font-size: 1.7rem;
+            line-height: 1;
+            font-weight: 800;
+        }
+        .live-kpi-sub {
+            color: #64748b;
+            font-size: 0.78rem;
+            margin-top: 8px;
+            font-weight: 600;
+        }
+        .live-dashboard-grid {
+            display: grid;
+            grid-template-columns: minmax(0, 1.35fr) minmax(280px, 0.65fr);
+            gap: 16px;
+            padding: 0 22px 22px;
+        }
+        .live-panel {
+            padding: 18px;
+            border-radius: 12px;
+            border: 1px solid rgba(148, 163, 184, 0.20);
+            background: rgba(255, 255, 255, 0.62);
+            min-height: 310px;
+        }
+        .live-panel h3 {
+            color: #172554;
+            font-size: 0.95rem;
+            font-weight: 800;
+            margin-bottom: 14px;
+        }
+        .live-chart-box {
+            position: relative;
+            height: 248px;
+        }
+        .live-side-grid {
+            display: grid;
+            grid-template-rows: 1fr auto;
+            gap: 16px;
+        }
+        .live-top-list {
+            display: grid;
+            gap: 9px;
+        }
+        .live-top-item {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 10px;
+            align-items: center;
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid rgba(148, 163, 184, 0.18);
+            border-radius: 10px;
+            background: rgba(248, 250, 252, 0.72);
+            color: #0f172a;
+            text-align: left;
+        }
+        .live-top-item:hover {
+            border-color: rgba(37, 99, 235, 0.30);
+            background: rgba(239, 246, 255, 0.88);
+        }
+        .live-top-name {
+            font-weight: 800;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .live-top-count {
+            color: #2563eb;
+            font-weight: 800;
+        }
+        .live-empty {
+            display: none;
+            padding: 20px 22px 22px;
+            color: #64748b;
+            font-weight: 700;
+        }
+
         .modal-content {
             border: 1px solid rgba(148, 163, 184, 0.26);
             border-radius: 12px;
@@ -114,6 +244,19 @@
                 width: fit-content;
             }
             .header-bg { padding-top: 24px; }
+            .live-dashboard-header {
+                align-items: flex-start;
+                flex-direction: column;
+            }
+            .live-dashboard-grid {
+                grid-template-columns: 1fr;
+            }
+            .live-kpi-grid,
+            .live-dashboard-grid,
+            .live-dashboard-header {
+                padding-left: 16px;
+                padding-right: 16px;
+            }
         }
     </style>
 </head>
@@ -143,6 +286,39 @@
         <div class="spinner-border text-primary" style="width: 3rem; height: 3rem;" role="status"></div>
         <p class="mt-3 text-muted fw-bold">Sincronizando divisas y datos maestros...</p>
     </div>
+
+    <section id="liveDashboard" class="live-dashboard live-glass-card">
+        <div class="live-dashboard-header">
+            <div>
+                <h2>Tráfico live del día</h2>
+                <div id="liveDashboardDate" class="live-dashboard-date">Sincronizando tráfico reciente...</div>
+            </div>
+        </div>
+        <div id="liveDashboardEmpty" class="live-empty">No hay tráfico live disponible para el día en curso.</div>
+        <div id="liveDashboardContent">
+            <div id="liveKpis" class="live-kpi-grid"></div>
+            <div class="live-dashboard-grid">
+                <div class="live-panel">
+                    <h3>Volumen por hora</h3>
+                    <div class="live-chart-box">
+                        <canvas id="liveHourlyChart"></canvas>
+                    </div>
+                </div>
+                <div class="live-side-grid">
+                    <div class="live-panel">
+                        <h3>Estado de entrega</h3>
+                        <div class="live-chart-box">
+                            <canvas id="liveStatusChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="live-panel">
+                        <h3>Top destinos live</h3>
+                        <div id="liveTopCountries" class="live-top-list"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
 
     <div class="row" id="cardsContainer"></div>
 </div>
@@ -231,6 +407,9 @@
     let allProviders = new Set();
     let banderasISO = {};
     let trafficVolumes = {};
+    let liveTrafficRows = [];
+    let liveTodayRows = [];
+    let liveCharts = {};
 
     let paisActual = "";
     let vistaDetallada = false;
@@ -363,10 +542,13 @@ $(document).ready(function() {
             // Protegemos el archivo Live Traffic por si no existe en GitHub Pages aún (Evita error de lectura)
             fetch(`datos/live_traffic.xlsx?t=${new Date().getTime()}`).then(r => r.ok ? r.arrayBuffer() : null).catch(() => null),
 
+            // Archivo diario completo para el dashboard live del dia en curso
+            fetch(`datos/live_today.xlsx?t=${new Date().getTime()}`).then(r => r.ok ? r.arrayBuffer() : null).catch(() => null),
+
             // API de divisas
             fetch('https://open.er-api.com/v6/latest/EUR').then(r => r.ok ? r.json() : null).catch(() => null)
         ])
-        .then(([paisesMundo, dualData, bufferLive, fxData]) => {
+        .then(([paisesMundo, dualData, bufferLive, bufferLiveToday, fxData]) => {
             try {
                 // 1. Tasa de cambio
                 if(fxData && fxData.rates && fxData.rates.USD) {
@@ -399,7 +581,8 @@ $(document).ready(function() {
                 if (bufferLive) {
                     try {
                         const wb = XLSX.read(bufferLive, { type: 'array' });
-                        const liveData = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
+                        const liveData = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { raw: false });
+                        liveTrafficRows = liveData;
                         liveData.forEach(row => {
                             if (row.CountryRealName) trafficVolumes[row.CountryRealName] = (trafficVolumes[row.CountryRealName] || 0) + 1;
                         });
@@ -409,6 +592,15 @@ $(document).ready(function() {
                 }
 
                 // 5. 🎯 MAPEO EXACTO PARA COSTOS (PROVEEDORES)
+                if (bufferLiveToday) {
+                    try {
+                        const wbToday = XLSX.read(bufferLiveToday, { type: 'array' });
+                        liveTodayRows = XLSX.utils.sheet_to_json(wbToday.Sheets[wbToday.SheetNames[0]], { raw: false });
+                    } catch (errLiveToday) {
+                        console.warn("No se pudo procesar el trafico live diario.", errLiveToday);
+                    }
+                }
+
                 normalizedData.costos.forEach(row => {
                     const item = mapCostRow(row);
                     const p = item.pais;
@@ -451,6 +643,7 @@ $(document).ready(function() {
                 // 7. Renderizar y ocultar carga
                 document.getElementById('loading').style.display = 'none';
                 renderizarTarjetas();
+                renderLiveDashboard(liveTodayRows);
                 llenarFiltroProveedores();
 
             } catch (errorFantasma) {
@@ -471,7 +664,258 @@ $(document).ready(function() {
         $(document).on('click', '.js-open-prov', function() { abrirProv($(this).attr('data-country')); });
         $(document).on('click', '.js-open-sales', function() { abrirVentas($(this).attr('data-country')); });
         $(document).on('click', '.js-open-live', function() { showLiveTraffic($(this).attr('data-country')); });
+        $(document).on('click', '.js-live-country', function() { showLiveTraffic($(this).attr('data-country')); });
     });
+
+    function parseLiveDate(value) {
+        if (!value) return null;
+        if (value instanceof Date && !Number.isNaN(value.getTime())) return value;
+
+        if (typeof value === 'number') {
+            const date = new Date(Math.round((value - 25569) * 86400 * 1000));
+            return Number.isNaN(date.getTime()) ? null : date;
+        }
+
+        const text = String(value).trim();
+        const iso = text.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})(?:[ T](\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
+        if (iso) {
+            const date = new Date(Number(iso[1]), Number(iso[2]) - 1, Number(iso[3]), Number(iso[4] || 0), Number(iso[5] || 0), Number(iso[6] || 0));
+            return Number.isNaN(date.getTime()) ? null : date;
+        }
+
+        const parts = text.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{2,4})(?:[ T](\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
+        if (parts) {
+            let first = Number(parts[1]);
+            let second = Number(parts[2]);
+            let year = Number(parts[3]);
+            if (year < 100) year += 2000;
+
+            const day = first > 12 ? first : (second > 12 ? second : first);
+            const month = first > 12 ? second : (second > 12 ? first : second);
+            const date = new Date(year, month - 1, day, Number(parts[4] || 0), Number(parts[5] || 0), Number(parts[6] || 0));
+            return Number.isNaN(date.getTime()) ? null : date;
+        }
+
+        const parsed = new Date(text);
+        return Number.isNaN(parsed.getTime()) ? null : parsed;
+    }
+
+    function formatLiveDateKey(date) {
+        const y = date.getFullYear();
+        const m = String(date.getMonth() + 1).padStart(2, '0');
+        const d = String(date.getDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
+    }
+
+    function formatLiveDateLabel(dateKey) {
+        if (!dateKey) return 'Sin fecha';
+        const [year, month, day] = dateKey.split('-');
+        return `${day}-${month}-${year}`;
+    }
+
+    function getLiveParts(row) {
+        const value = Number(row?.MessageParts);
+        return Number.isFinite(value) && value > 0 ? value : 1;
+    }
+
+    function getLiveStatus(row) {
+        const status = String(row?.DLRStatus || 'Sin estado').trim();
+        return status || 'Sin estado';
+    }
+
+    function getLiveVendor(row) {
+        const vendor = String(row?.VendorAccountName || '').trim();
+        return vendor && vendor.toUpperCase() !== 'N/A' ? vendor : 'Sin vendor';
+    }
+
+    function buildLiveDashboardData(rows) {
+        const parsedRows = rows
+            .map(row => ({ row, date: parseLiveDate(row.SubmitDate) }))
+            .filter(item => item.date);
+        const todayKey = formatLiveDateKey(new Date());
+        const availableKeys = [...new Set(parsedRows.map(item => formatLiveDateKey(item.date)))].sort();
+        const activeKey = availableKeys.includes(todayKey) ? todayKey : (availableKeys[availableKeys.length - 1] || todayKey);
+        const activeRows = parsedRows.filter(item => formatLiveDateKey(item.date) === activeKey);
+
+        const hourly = Array.from({ length: 24 }, () => 0);
+        const byStatus = {};
+        const byCountry = {};
+        const vendors = new Set();
+        let total = 0;
+        let delivered = 0;
+
+        activeRows.forEach(({ row, date }) => {
+            const parts = getLiveParts(row);
+            const status = getLiveStatus(row);
+            const country = String(row.CountryRealName || 'Sin pais').trim() || 'Sin pais';
+            const vendor = getLiveVendor(row);
+
+            total += parts;
+            if (status === 'Delivered') delivered += parts;
+            hourly[date.getHours()] += parts;
+            byStatus[status] = (byStatus[status] || 0) + parts;
+            byCountry[country] = (byCountry[country] || 0) + parts;
+            vendors.add(vendor);
+        });
+
+        return {
+            activeKey,
+            isToday: activeKey === todayKey,
+            rows: activeRows,
+            hourly,
+            byStatus,
+            byCountry,
+            vendors,
+            total,
+            delivered,
+            countries: Object.keys(byCountry).length
+        };
+    }
+
+    function renderLiveDashboard(rows) {
+        const wrapper = document.getElementById('liveDashboard');
+        const content = document.getElementById('liveDashboardContent');
+        const empty = document.getElementById('liveDashboardEmpty');
+        const dateLabel = document.getElementById('liveDashboardDate');
+        if (!wrapper || !content || !empty || !dateLabel) return;
+
+        wrapper.style.display = 'block';
+        const live = buildLiveDashboardData(rows || []);
+        dateLabel.textContent = live.isToday
+            ? `Hoy ${formatLiveDateLabel(live.activeKey)}`
+            : `Ultimo corte disponible: ${formatLiveDateLabel(live.activeKey)}`;
+
+        if (!live.rows.length) {
+            content.style.display = 'none';
+            empty.style.display = 'block';
+            return;
+        }
+
+        empty.style.display = 'none';
+        content.style.display = 'block';
+        renderLiveKpis(live);
+        renderLiveHourlyChart(live);
+        renderLiveStatusChart(live);
+        renderLiveTopCountries(live);
+    }
+
+    function renderLiveKpis(live) {
+        const deliveryRate = live.total > 0 ? (live.delivered / live.total * 100).toFixed(1) : '0.0';
+        const lastDate = live.rows
+            .map(item => item.date)
+            .sort((a, b) => b - a)[0];
+        const lastLabel = lastDate
+            ? lastDate.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })
+            : '--:--';
+
+        document.getElementById('liveKpis').innerHTML = `
+            <div class="live-kpi">
+                <div class="live-kpi-label">SMS live</div>
+                <div class="live-kpi-value">${live.total.toLocaleString()}</div>
+                <div class="live-kpi-sub">${live.rows.length.toLocaleString()} registros</div>
+            </div>
+            <div class="live-kpi">
+                <div class="live-kpi-label">Delivered</div>
+                <div class="live-kpi-value">${deliveryRate}%</div>
+                <div class="live-kpi-sub">${live.delivered.toLocaleString()} SMS entregados</div>
+            </div>
+            <div class="live-kpi">
+                <div class="live-kpi-label">Destinos activos</div>
+                <div class="live-kpi-value">${live.countries.toLocaleString()}</div>
+                <div class="live-kpi-sub">${live.vendors.size.toLocaleString()} vendors activos</div>
+            </div>
+            <div class="live-kpi">
+                <div class="live-kpi-label">Ultimo evento</div>
+                <div class="live-kpi-value">${lastLabel}</div>
+                <div class="live-kpi-sub">${formatLiveDateLabel(live.activeKey)}</div>
+            </div>
+        `;
+    }
+
+    function renderLiveHourlyChart(live) {
+        const canvas = document.getElementById('liveHourlyChart');
+        if (!canvas || !window.Chart) return;
+        if (liveCharts.hourly) liveCharts.hourly.destroy();
+
+        liveCharts.hourly = new Chart(canvas, {
+            type: 'bar',
+            data: {
+                labels: live.hourly.map((_, hour) => `${String(hour).padStart(2, '0')}:00`),
+                datasets: [{
+                    label: 'SMS',
+                    data: live.hourly,
+                    backgroundColor: 'rgba(37, 99, 235, 0.72)',
+                    borderColor: '#60a5fa',
+                    borderWidth: 1,
+                    borderRadius: 7
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: ctx => `SMS: ${Number(ctx.raw || 0).toLocaleString()}`
+                        }
+                    }
+                },
+                scales: {
+                    x: { grid: { display: false }, ticks: { color: '#64748b', maxRotation: 0, autoSkip: true, maxTicksLimit: 8 } },
+                    y: { beginAtZero: true, grid: { color: 'rgba(148, 163, 184, 0.20)' }, ticks: { color: '#64748b' } }
+                }
+            }
+        });
+    }
+
+    function renderLiveStatusChart(live) {
+        const canvas = document.getElementById('liveStatusChart');
+        if (!canvas || !window.Chart) return;
+        if (liveCharts.status) liveCharts.status.destroy();
+
+        const statusEntries = Object.entries(live.byStatus).sort((a, b) => b[1] - a[1]);
+        liveCharts.status = new Chart(canvas, {
+            type: 'doughnut',
+            data: {
+                labels: statusEntries.map(([name]) => name),
+                datasets: [{
+                    data: statusEntries.map(([, value]) => value),
+                    backgroundColor: ['#22c55e', '#f59e0b', '#ef4444', '#38bdf8', '#a78bfa', '#94a3b8'],
+                    borderColor: 'rgba(255,255,255,0.78)',
+                    borderWidth: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'bottom', labels: { color: '#334155', boxWidth: 12, padding: 12 } },
+                    tooltip: {
+                        callbacks: {
+                            label: ctx => `${ctx.label}: ${Number(ctx.raw || 0).toLocaleString()} SMS`
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    function renderLiveTopCountries(live) {
+        const container = document.getElementById('liveTopCountries');
+        if (!container) return;
+
+        const countries = Object.entries(live.byCountry)
+            .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+            .slice(0, 8);
+
+        container.innerHTML = countries.map(([country, total]) => `
+            <button type="button" class="live-top-item js-live-country" data-country="${escapeAttr(country)}">
+                <span class="live-top-name">${escapeHtml(country)}</span>
+                <span class="live-top-count">${Number(total || 0).toLocaleString()}</span>
+            </button>
+        `).join('');
+    }
 
     function formatDualCurrency(amount, currency) {
         amount = parseFloat(amount) || 0;

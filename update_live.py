@@ -10,6 +10,7 @@ from bs4 import BeautifulSoup
 USUARIO = os.environ.get("SMS_USER")
 CLAVE = os.environ.get("SMS_PASS")
 RUTA_LIVE = "datos/live_traffic.xlsx"
+RUTA_LIVE_TODAY = "datos/live_today.xlsx"
 
 URL_BASE = "http://65.108.69.39:5660"
 URL_LOGIN = f"{URL_BASE}/Home/CheckLogin"
@@ -61,18 +62,12 @@ def login():
     print("Login live enviado correctamente.")
 
 
-def update_live():
-    os.makedirs("datos", exist_ok=True)
-    login()
-
-    ahora = datetime.now()
-    hace_12h = ahora - timedelta(hours=12)
-
-    print(f"Descargando trafico desde {hace_12h:%Y-%m-%d %H:%M:%S} hasta {ahora:%Y-%m-%d %H:%M:%S}...")
+def descargar_reporte(start_date, end_date, label):
+    print(f"Descargando {label} desde {start_date:%Y-%m-%d %H:%M:%S} hasta {end_date:%Y-%m-%d %H:%M:%S}...")
 
     params = {
-        "StartDate": hace_12h.strftime("%Y-%m-%d %H:%M:%S"),
-        "EndDate": ahora.strftime("%Y-%m-%d %H:%M:%S"),
+        "StartDate": start_date.strftime("%Y-%m-%d %H:%M:%S"),
+        "EndDate": end_date.strftime("%Y-%m-%d %H:%M:%S"),
     }
 
     r = session.get(URL_DESCARGA, params=params, timeout=120)
@@ -80,17 +75,39 @@ def update_live():
 
     if r.content[:2] != b"PK":
         preview = r.text[:180].replace("\n", " ").replace("\r", " ")
-        raise RuntimeError(f"El servidor no entrego un Excel valido para trafico live: {preview}")
+        raise RuntimeError(f"El servidor no entrego un Excel valido para {label}: {preview}")
 
-    df = pd.read_excel(io.BytesIO(r.content))
+    return pd.read_excel(io.BytesIO(r.content))
+
+
+def guardar_excel(df, ruta, label):
     if df.empty:
-        df.to_excel(RUTA_LIVE, index=False)
-        print("No hay trafico en las ultimas 12 horas. Se guardo un live vacio para evitar datos obsoletos.")
+        df.to_excel(ruta, index=False)
+        print(f"No hay trafico para {label}. Se guardo un Excel vacio para evitar datos obsoletos.")
         return
 
     df_live = df.sort_values("SubmitDate", ascending=False).head(300000)
-    df_live.to_excel(RUTA_LIVE, index=False)
-    print(f"Live Traffic actualizado: {len(df_live)} registros guardados en {RUTA_LIVE}")
+    df_live.to_excel(ruta, index=False)
+    print(f"{label} actualizado: {len(df_live)} registros guardados en {ruta}")
+
+
+def update_live():
+    os.makedirs("datos", exist_ok=True)
+    login()
+
+    ahora = datetime.now()
+    hace_12h = ahora - timedelta(hours=12)
+    inicio_dia = ahora.replace(hour=0, minute=0, second=0, microsecond=0)
+
+    df_12h = descargar_reporte(hace_12h, ahora, "trafico live ultimas 12 horas")
+    guardar_excel(df_12h, RUTA_LIVE, "Live Traffic 12h")
+
+    try:
+        df_today = descargar_reporte(inicio_dia, ahora, "trafico live del dia en curso")
+        guardar_excel(df_today, RUTA_LIVE_TODAY, "Live Traffic diario")
+    except Exception as exc:
+        pd.DataFrame().to_excel(RUTA_LIVE_TODAY, index=False)
+        print(f"No se pudo actualizar Live Traffic diario. Se guardo un Excel vacio para no publicar datos obsoletos: {exc}")
 
 
 if __name__ == "__main__":
